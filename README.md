@@ -150,7 +150,7 @@ Open: `http://127.0.0.1:5500/`
 
 For collaboration, technical inquiries, or licensing:
 
-\*\*\[info@dim.productions](mailto:info@dim.productions)\*\*
+\*\*\[info@dim.productions]\*\*
 
 
 
@@ -159,5 +159,6 @@ For collaboration, technical inquiries, or licensing:
 
 
 © 2026 DIMProductions
+
 
 
