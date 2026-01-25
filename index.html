@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Loomis Rotation Lab</title>
+  <style>
+    :root{
+      --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
+      --text:#e8ecf2; --muted:#9aa4b2; --accent:#00d0ff; --danger:#ff4444;
+      --canvas:#ffffff; /* ★修正: 純白に変更 */
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui, sans-serif;
+      background:var(--bg); color:var(--text); height:100vh; overflow:hidden;
+    }
+
+    /* Top Bar */
+    .topbar{
+      height:54px; background:linear-gradient(180deg, #0f131b, #0b0e14);
+      border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 12px; gap:12px;
+    }
+    .brand{ font-weight:700; font-size:13px; padding:6px 10px; border:1px solid var(--line); background:#0d1016; border-radius:10px; }
+    .tabs{ display:flex; gap:6px; align-items:center; }
+    .tab{
+      border:1px solid var(--line); background:#0d1118; color:var(--text); padding:8px 12px; border-radius:10px; font-size:12px; cursor:pointer; user-select:none;
+    }
+    .tab.on{ border-color:var(--accent); box-shadow:0 0 0 1px rgba(0,208,255,.25) inset; }
+    .status{ margin-left:auto; font-size:11px; color:var(--muted); padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#0d1016; white-space:nowrap; }
+
+    /* Layout */
+    .main{ height:calc(100vh - 54px); display:grid; grid-template-columns: 240px 1fr 260px; gap:12px; padding:12px; }
+    .panel{ background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0; }
+    .panel h3{ margin:0 0 4px; font-size:12px; color:var(--muted); letter-spacing:0.2px; border-bottom:1px solid #222; padding-bottom:4px; }
+    
+    .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn{ border:1px solid var(--line); background:var(--ui2); color:var(--text); padding:8px 10px; border-radius:12px; font-size:12px; cursor:pointer; user-select:none; text-align:center; flex:1; transition:0.1s; }
+    .btn:hover{ filter:brightness(1.2); }
+    .btn.active{ background:var(--accent); color:#000; border-color:var(--accent); font-weight:bold; }
+    .btn.danger{ border-color:rgba(255,68,68,.5); color:#ffaaaa; }
+    .btn.accent{ border-color:rgba(0,208,255,.55); color:#ccf8ff; }
+    .btn.small{ padding:4px 8px; font-size:11px; border-radius:8px; flex:initial; }
+    .sep{ height:1px; background:#222a38; margin:6px 0; }
+
+    label{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
+    input[type="range"]{ width:100%; margin:4px 0; }
+
+    /* Tab Slots */
+    .tabSlot{ display:none; }
+    .tabSlot.on{ display:block; }
+
+    /* Stage */
+    .stageWrap{ background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; min-height:0; display:flex; flex-direction:column; gap:10px; }
+    .stageHeader{ display:flex; align-items:center; gap:10px; }
+    .stageHeader .mini{ font-size:11px; color:var(--muted); }
+    .stage{ position:relative; width:100%; height:100%; background:var(--canvas); overflow:hidden; touch-action:none; border-radius:4px; display:flex; align-items:center; justify-content:center; }
+    
+    /* --- MATRIX VIEWER STYLES --- */
+    #refContainer {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      overflow: hidden; 
+      z-index: 0;
+      opacity: 0.5;
+      pointer-events: none;
+      width: 500px; height: 500px;
+      transform-origin: center center;
+      /* ★修正: 初期状態は非表示（DRAWモード開始のため） */
+      display: none; 
+    }
+
+    #refImage {
+      display: block;
+      position: absolute;
+      top: 0; left: 0;
+      transform-origin: 0 0;
+    }
+
+    canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index: 10; }
+
+    /* Layers List */
+    .layersList{ overflow:auto; border:1px solid #1f2633; border-radius:12px; background:#0e121a; padding:8px; flex:1; }
+    .layerItem{ border:1px solid #263045; background:#101624; border-radius:8px; padding:6px 8px; margin-bottom:4px; display:flex; gap:8px; align-items:center; cursor:pointer; user-select:none; }
+    .layerItem.on{ border-color:rgba(0,208,255,.55); background:#1a202c; }
+    .eye{ width:24px; text-align:center; cursor:pointer; font-size:14px; }
+    .lname{ flex:1; font-size:12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .op{ font-size:10px; color:var(--muted); width:30px; text-align:right; }
+    .moveBtns{ display:flex; flex-direction:column; gap:2px; }
+    .moveBtn{ font-size:8px; padding:2px 4px; border:1px solid var(--line); border-radius:4px; cursor:pointer; background:#222; color:#aaa; line-height:1; }
+    .moveBtn:hover{ background:var(--accent); color:#000; }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">Loomis Rotation Lab</div>
+    <div class="tabs">
+      <div class="tab on" data-tab="draw">DRAW</div>
+      <div class="tab" data-tab="trace">TRACE</div>
+      <div class="tab" data-tab="export">EXPORT</div>
+    </div>
+    <div class="status" id="status">Ready</div>
+  </div>
+
+  <div class="main">
+    <div class="panel">
+      
+      <div id="slot-draw" class="tabSlot on">
+        <h3>TOOLS</h3>
+        <div class="row">
+          <div class="btn active" id="toolPen">G-Pen</div>
+          <div class="btn" id="toolEraser">Eraser</div>
+        </div>
+        
+        <div class="sep"></div>
+        <h3>PEN SETTINGS</h3>
+        <label>Size <span id="vSize">4.0</span></label>
+        <input id="penSize" type="range" min="1" max="40" value="4">
+        <label>Taper <span id="vTaper">0.5</span></label>
+        <input id="penTaper" type="range" min="0" max="1" value="0.5" step="0.05">
+        <label>Pressure <span id="vPress">0.8</span></label>
+        <input id="penPress" type="range" min="0" max="1" value="0.8" step="0.05">
+        <label>Smooth <span id="vSmooth">0.4</span></label>
+        <input id="penSmooth" type="range" min="0" max="0.95" value="0.4" step="0.05">
+        
+        <div class="sep"></div>
+        <div class="btn danger" id="btnClearActive">Clear Layer</div>
+      </div>
+
+      <div id="slot-trace" class="tabSlot">
+        <h3>MATRIX CONTROLLER</h3>
+        <div class="hint">Source: <b>source/loomis_source.svg</b></div>
+        
+        <label>Yaw (Rotate) <span id="vYaw">0°</span></label>
+        <input id="traceYaw" type="range" min="-4" max="4" step="1" value="0">
+        
+        <label>Pitch (Tilt) <span id="vPitch">0°</span></label>
+        <input id="tracePitch" type="range" min="-3" max="3" step="1" value="0">
+
+        <div class="sep"></div>
+        <h3>REF SETTINGS</h3>
+        
+        <label>Zoom <span id="vRefZoom">1.0</span></label>
+        <input id="refZoom" type="range" min="0.2" max="3.0" step="0.05" value="1.0">
+        
+        <label>Opacity <span id="vRefOp">0.5</span></label>
+        <input id="refOp" type="range" min="0" max="1" step="0.05" value="0.5">
+        
+        <div class="sep"></div>
+        <label>Offset X</label>
+        <input id="refOffX" type="range" min="-250" max="250" value="0">
+        <label>Offset Y</label>
+        <input id="refOffY" type="range" min="-250" max="250" value="0">
+      </div>
+
+      <div id="slot-export" class="tabSlot">
+        <h3>EXPORT</h3>
+        <div class="btn accent" id="btnExportPNG">Export PNG</div>
+        <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
+      </div>
+    </div>
+
+    <div class="stageWrap">
+      <div class="stageHeader"><div class="mini">Canvas: Auto-Fit</div></div>
+      <div class="stage" id="stage">
+        <div id="refContainer">
+            <img id="refImage" src="source/loomis_source.svg" alt="Loomis Grid">
+        </div>
+        
+        <canvas id="composite"></canvas>
+        <canvas id="input"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>LAYERS</h3>
+      <div class="row">
+        <div class="btn accent small" id="btnAddLayer">+ New</div>
+        <div class="btn small" id="btnDupLayer">Copy</div>
+        <div class="btn danger small" id="btnDelLayer">Del</div>
+      </div>
+      <label>Opacity <span id="vLayerOp">1.0</span></label>
+      <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
+      <div class="sep"></div>
+      <div class="layersList" id="layersList"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // --- UI TABS ---
+  const tabs = document.querySelectorAll('.tab');
+  const slots = { draw:document.getElementById('slot-draw'), trace:document.getElementById('slot-trace'), export:document.getElementById('slot-export') };
+  const refContainer = document.getElementById('refContainer');
+
+  function setTab(m){
+    tabs.forEach(t=>t.classList.toggle('on', t.dataset.tab===m));
+    Object.values(slots).forEach(e=>e.classList.remove('on'));
+    if(slots[m]) slots[m].classList.add('on');
+
+    // ★修正: DRAW/EXPORTモードでは参照画像を消す (TRACEモードのみ表示)
+    if(m === 'trace'){
+      refContainer.style.display = 'block';
+    } else {
+      refContainer.style.display = 'none';
+    }
+  }
+  tabs.forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
+
+  // --- CANVAS ENGINE ---
+  const stage=document.getElementById('stage'), cComp=document.getElementById('composite'), cInput=document.getElementById('input');
+  const gComp=cComp.getContext('2d'), gInput=cInput.getContext('2d');
+  
+  function resize(){
+    const r=stage.getBoundingClientRect();
+    cComp.width = cInput.width = Math.floor(r.width);
+    cComp.height = cInput.height = Math.floor(r.height);
+    ensureLayerSize(); redrawComposite();
+  }
+  window.addEventListener('resize', resize);
+
+  // --- LAYER SYSTEM ---
+  let layers=[], activeIdx=0;
+  function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+  function addLayer(name){
+    const c=makeCanvas(cComp.width, cComp.height);
+    layers.unshift({name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d')});
+    activeIdx=0; updateLayerUI();
+  }
+  function moveLayer(idx, dir){
+    const newIdx = idx + dir;
+    if(newIdx < 0 || newIdx >= layers.length) return;
+    const tmp = layers[idx]; layers[idx] = layers[newIdx]; layers[newIdx] = tmp;
+    if(activeIdx === idx) activeIdx = newIdx; else if(activeIdx === newIdx) activeIdx = idx;
+    updateLayerUI(); redrawComposite();
+  }
+  function updateLayerUI(){
+    const list=document.getElementById('layersList'); list.innerHTML='';
+    layers.forEach((L,i)=>{
+      const el=document.createElement('div');
+      el.className=`layerItem ${i===activeIdx?'on':''}`;
+      el.innerHTML=`
+        <div class="eye">${L.visible?'👁':'·'}</div>
+        <div class="lname">${L.name}</div>
+        <div class="moveBtns"><div class="moveBtn up">▲</div><div class="moveBtn down">▼</div></div>
+        <div class="op">${L.opacity.toFixed(1)}</div>
+      `;
+      el.querySelector('.eye').onclick=(e)=>{e.stopPropagation(); L.visible=!L.visible; updateLayerUI(); redrawComposite();};
+      el.querySelector('.moveBtn.up').onclick=(e)=>{e.stopPropagation(); moveLayer(i, -1);};
+      el.querySelector('.moveBtn.down').onclick=(e)=>{e.stopPropagation(); moveLayer(i, 1);};
+      el.onclick=()=>{activeIdx=i; updateLayerUI(); syncLayerOp();};
+      list.appendChild(el);
+    });
+    ensureLayerSize(); redrawComposite();
+  }
+  function redrawComposite(){
+    gComp.clearRect(0,0,cComp.width,cComp.height);
+    for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
+  }
+  function ensureLayerSize(){
+    layers.forEach(L=>{
+      if(L.canvas.width!==cComp.width || L.canvas.height!==cComp.height){
+        const c=makeCanvas(cComp.width, cComp.height); c.getContext('2d').drawImage(L.canvas,0,0); L.canvas=c; L.ctx=c.getContext('2d');
+      }
+    });
+  }
+  function syncLayerOp(){
+    if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); }
+  }
+
+  // --- PEN ENGINE ---
+  let drawing=false, pts=[]; let toolType = 'pen';
+  const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
+  
+  document.getElementById('toolPen').onclick=()=>{ toolType='pen'; document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); };
+  document.getElementById('toolEraser').onclick=()=>{ toolType='eraser'; document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); };
+
+  const bindSet = (id, key, dispId) => {
+    document.getElementById(id).oninput=(e)=>{ penSettings[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = penSettings[key]; };
+  };
+  bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); bindSet('penSmooth','smooth','vSmooth'); bindSet('penTaper','taper','vTaper');
+
+  function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function smoothstep(t){ t=clamp(t,0,1); return t*t*(3-2*t); }
+  function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  function getStrokeLengths(pts){ const lens=[0]; let total=0; for(let i=1; i<pts.length; i++){ total += dist(pts[i-1], pts[i]); lens.push(total); } return {lens, total}; }
+  function getWidthAt(tNorm, pressure, settings){
+    const taperLen = Math.max(0.01, settings.taper); 
+    const inT = smoothstep(tNorm / taperLen); const outT = smoothstep((1-tNorm) / taperLen);
+    const pFactor = Math.pow(pressure, 1.5); 
+    const pressFactor = lerp(1.0 - settings.press, 1.0, pFactor);
+    return settings.size * pressFactor * Math.min(inT, outT);
+  }
+
+  cInput.addEventListener('pointerdown', e=>{
+    if(!layers[activeIdx].visible) return; drawing=true; cInput.setPointerCapture(e.pointerId); pts=[{x:e.offsetX, y:e.offsetY, p:e.pressure||0.5}];
+  });
+  cInput.addEventListener('pointermove', e=>{
+    if(!drawing) return; const raw={x:e.offsetX, y:e.offsetY, p:e.pressure||0.5};
+    const k = 1.0 - penSettings.smooth; const last = pts[pts.length-1];
+    pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
+    drawPreview(gInput, pts);
+  });
+  const endStroke = ()=>{
+    if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
+    ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over';
+    drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
+  };
+  cInput.addEventListener('pointerup', endStroke);
+
+  function drawStroke(ctx, points){
+    if(points.length<2) return; const {lens, total} = getStrokeLengths(points);
+    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
+    for(let i=1; i<points.length; i++){
+      const t0 = lens[i-1]/total, t1 = lens[i]/total;
+      const w0 = getWidthAt(t0, points[i-1].p, penSettings), w1 = getWidthAt(t1, points[i].p, penSettings);
+      ctx.beginPath(); ctx.moveTo(points[i-1].x, points[i-1].y); ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineWidth = (w0+w1)*0.5; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(points[i].x, points[i].y, w1/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
+    }
+  }
+  function drawPreview(ctx, points){
+    ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); if(points.length<2) return;
+    if(toolType==='eraser'){
+      ctx.strokeStyle = '#ffcccc'; ctx.globalAlpha=0.5; ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y); for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineWidth = penSettings.size; ctx.stroke();
+    } else drawStroke(ctx, points);
+  }
+
+  // --- BUTTONS ---
+  document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
+  document.getElementById('btnDelLayer').onclick=()=>{if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}};
+  document.getElementById('btnDupLayer').onclick=()=>{
+    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); c.getContext('2d').drawImage(src.canvas,0,0);
+    layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, opacity:src.opacity, canvas:c, ctx:c.getContext('2d')});
+    updateLayerUI();
+  };
+  document.getElementById('btnClearActive').onclick=()=>{ layers[activeIdx].ctx.clearRect(0,0,cComp.width,cComp.height); redrawComposite(); };
+  document.getElementById('layerOpacity').oninput=(e)=>{ if(layers[activeIdx]){ layers[activeIdx].opacity=+e.target.value; document.getElementById('vLayerOp').innerText=layers[activeIdx].opacity.toFixed(2); redrawComposite(); } };
+  document.getElementById('btnExportPNG').onclick=()=>{
+    const c=makeCanvas(cComp.width,cComp.height), x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+    for(let i=layers.length-1;i>=0;i--){ if(layers[i].visible) x.drawImage(layers[i].canvas,0,0); }
+    const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
+  };
+
+  // --- MATRIX TRACE LOGIC ---
+  const refImage = document.getElementById('refImage');
+  // Controls
+  const uiYaw = document.getElementById('traceYaw');
+  const uiPitch = document.getElementById('tracePitch');
+  const uiZoom = document.getElementById('refZoom');
+  const uiOp = document.getElementById('refOp');
+  const uiOffX = document.getElementById('refOffX');
+  const uiOffY = document.getElementById('refOffY');
+
+  // Config
+  const CELL_W = 500;
+  const CELL_H = 500;
+
+  function updateMatrixView(){
+    const yawVal = parseInt(uiYaw.value);
+    const pitchVal = parseInt(uiPitch.value);
+    const zoomVal = parseFloat(uiZoom.value);
+    const opVal = parseFloat(uiOp.value);
+    const offX = parseInt(uiOffX.value);
+    const offY = parseInt(uiOffY.value);
+
+    // Labels
+    document.getElementById('vYaw').innerText = (yawVal * 15) + "°";
+    document.getElementById('vPitch').innerText = (pitchVal * 15) + "°";
+    document.getElementById('vRefZoom').innerText = zoomVal.toFixed(2);
+    document.getElementById('vRefOp').innerText = opVal.toFixed(2);
+
+    // Opacity
+    refContainer.style.opacity = opVal;
+
+    // Zoom & Container Size
+    refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
+
+    // Sprite Shift Logic
+    const col = yawVal + 4; 
+    const row = 3 - pitchVal; 
+    const targetX = -1 * (col * CELL_W) + offX;
+    const targetY = -1 * (row * CELL_H) + offY;
+
+    refImage.style.transform = `translate(${targetX}px, ${targetY}px)`;
+  }
+
+  [uiYaw, uiPitch, uiZoom, uiOp, uiOffX, uiOffY].forEach(el => {
+    el.addEventListener('input', updateMatrixView);
+  });
+
+  // Init
+  resize(); addLayer("Line Art");
+  updateMatrixView();
+  // ★重要: 初期状態はDRAWモードなのでリファレンスは非表示にする
+  setTab('draw');
+
+})();
+</script>
+</body>
+</html>
