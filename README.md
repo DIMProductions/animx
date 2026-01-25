@@ -92,7 +92,7 @@ loomis-rotation-lab/
 
 ├── source/
 
-│   └── loomis\_source.svg
+│   └── loomis_source.svg
 
 └── README.md
 
@@ -159,4 +159,5 @@ For collaboration, technical inquiries, or licensing:
 
 
 © 2026 DIMProductions
+
 
