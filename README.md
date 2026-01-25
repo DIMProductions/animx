@@ -66,13 +66,13 @@ Open: http://127.0.0.1:5500/
 
 ## 🧭 Roadmap
 
-* [ ] **Audit Layer**: PASS/FAIL structural checks (anchor drift, underside visibility, etc.)
+ Audit Layer: PASS/FAIL structural checks (anchor drift, underside visibility, etc.)
 
-* [ ] **Angle Presets**: drill sets for yaw/pitch training
+ Angle Presets: drill sets for yaw/pitch training
 
-* [ ] **Export Sheets**: PNG/PDF worksheet output
+ Export Sheets: PNG/PDF worksheet output
 
-* [ ] **More Guides**: optional construction overlays (clean -> dense)
+ More Guides: optional construction overlays (clean -> dense)
 
 ---
 
