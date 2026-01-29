@@ -8,7 +8,7 @@
     :root{
       --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
       --text:#e8ecf2; --muted:#9aa4b2; --accent:#00d0ff; --danger:#ff4444;
-      --canvas:#ffffff;
+      --canvas:#ffffff; --kofi:#ff5e5b;
     }
     *{box-sizing:border-box}
     body{
@@ -27,7 +27,15 @@
       border:1px solid var(--line); background:#0d1118; color:var(--text); padding:8px 12px; border-radius:10px; font-size:12px; cursor:pointer; user-select:none;
     }
     .tab.on{ border-color:var(--accent); box-shadow:0 0 0 1px rgba(0,208,255,.25) inset; }
-    .status{ margin-left:auto; font-size:11px; color:var(--muted); padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#0d1016; white-space:nowrap; }
+    
+    /* Support Button (Replaced Status) */
+    .support-link{ 
+      margin-left:auto; text-decoration:none; display:flex; align-items:center; gap:6px;
+      font-size:11px; color:var(--text); padding:6px 12px; border:1px solid var(--line); 
+      border-radius:10px; background:#0d1016; transition: 0.2s;
+    }
+    .support-link:hover{ border-color: var(--kofi); background: rgba(255, 94, 91, 0.1); }
+    .support-link img{ height:14px; }
 
     /* Layout */
     .main{ height:calc(100vh - 54px); display:grid; grid-template-columns: 240px 1fr 260px; gap:12px; padding:12px; }
@@ -52,17 +60,14 @@
     .toggle:checked { background:var(--accent); border-color:var(--accent); }
     .toggle:checked::after { left:13px; background:#000; }
 
-    /* Tab Slots */
     .tabSlot{ display:none; }
     .tabSlot.on{ display:block; }
 
-    /* Stage */
     .stageWrap{ background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; min-height:0; display:flex; flex-direction:column; gap:10px; }
     .stageHeader{ display:flex; align-items:center; gap:10px; }
     .stageHeader .mini{ font-size:11px; color:var(--muted); }
     .stage{ position:relative; width:100%; height:100%; background:var(--canvas); overflow:hidden; touch-action:none; border-radius:4px; display:flex; align-items:center; justify-content:center; }
     
-    /* --- MATRIX VIEWER STYLES --- */
     #refContainer {
       position: absolute;
       top: 50%; left: 50%;
@@ -86,7 +91,6 @@
 
     canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index: 10; }
 
-    /* Layers List */
     .layersList{ overflow:auto; border:1px solid #1f2633; border-radius:12px; background:#0e121a; padding:8px; flex:1; }
     .layerItem{ border:1px solid #263045; background:#101624; border-radius:8px; padding:6px 8px; margin-bottom:4px; display:flex; gap:8px; align-items:center; cursor:pointer; user-select:none; }
     .layerItem.on{ border-color:rgba(0,208,255,.55); background:#1a202c; }
@@ -110,7 +114,11 @@
     <div class="tab on" data-tab="draw">DRAW</div>
     <div class="tab" data-tab="export">EXPORT</div>
   </div>
-  <div class="status" id="status">Ready</div>
+
+  <a href="https://ko-fi.com/dimproductions" target="_blank" class="support-link">
+    <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi">
+    <span>Support us</span>
+  </a>
 </div>
 
   <div class="main">
@@ -195,7 +203,6 @@
 
 <script>
 (() => {
-  // --- UI TABS ---
   const tabs = document.querySelectorAll('.tab');
   const slots = { draw:document.getElementById('slot-draw'), export:document.getElementById('slot-export') };
   const refContainer = document.getElementById('refContainer'); 
@@ -204,11 +211,9 @@
     tabs.forEach(t=>t.classList.toggle('on', t.dataset.tab===m));
     Object.values(slots).forEach(e=>e.classList.remove('on'));
     if(slots[m]) slots[m].classList.add('on');
-    // Trace logic is now controlled by switch, not tab
   }
   tabs.forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
 
-  // --- CANVAS ENGINE ---
   const stage=document.getElementById('stage'), cComp=document.getElementById('composite'), cInput=document.getElementById('input');
   const gComp=cComp.getContext('2d'), gInput=cInput.getContext('2d');
   
@@ -221,7 +226,6 @@
   }
   window.addEventListener('resize', resize);
 
-  // --- LAYER SYSTEM ---
   let layers=[], activeIdx=0;
   function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
   function addLayer(name){
@@ -270,12 +274,7 @@
     if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); }
   }
 
-  // --- UNDO / REDO SYSTEM ---
-  let history = [];
-  let historyStep = -1;
-  const MAX_HISTORY = 20;
-  let strokeStartData = null; 
-
+  let history = []; let historyStep = -1; const MAX_HISTORY = 20; let strokeStartData = null; 
   function recordHistory(oldData, newData, lIdx){
     if(historyStep < history.length - 1){ history = history.slice(0, historyStep + 1); }
     history.push({ layerIdx: lIdx, before: oldData, after: newData });
@@ -306,13 +305,10 @@
     if((e.ctrlKey || e.metaKey) && e.key === 'y'){ e.preventDefault(); performRedo(); }
   });
 
-  // --- PEN ENGINE ---
   let drawing=false, pts=[]; let toolType = 'pen';
   const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
-  
   document.getElementById('toolPen').onclick=()=>{ toolType='pen'; document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); };
   document.getElementById('toolEraser').onclick=()=>{ toolType='eraser'; document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); };
-
   const bindSet = (id, key, dispId) => {
     document.getElementById(id).oninput=(e)=>{ penSettings[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = penSettings[key]; };
   };
@@ -326,8 +322,7 @@
   function getWidthAt(tNorm, pressure, settings){
     const taperLen = Math.max(0.01, settings.taper); 
     const inT = smoothstep(tNorm / taperLen); const outT = smoothstep((1-tNorm) / taperLen);
-    const pFactor = Math.pow(pressure, 1.5); 
-    const pressFactor = lerp(1.0 - settings.press, 1.0, pFactor);
+    const pFactor = Math.pow(pressure, 1.5); const pressFactor = lerp(1.0 - settings.press, 1.0, pFactor);
     return settings.size * pressFactor * Math.min(inT, outT);
   }
 
@@ -370,7 +365,6 @@
     } else drawStroke(ctx, points);
   }
 
-  // --- BUTTONS ---
   document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
   document.getElementById('btnDelLayer').onclick=()=>{if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}};
   document.getElementById('btnDupLayer').onclick=()=>{
@@ -390,58 +384,36 @@
     const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
   };
 
-  // --- MATRIX TRACE LOGIC (MERGED) ---
   const refImage = document.getElementById('refImage');
   const uiToggle = document.getElementById('refToggle');
   const uiYaw = document.getElementById('traceYaw');
   const uiPitch = document.getElementById('tracePitch');
   const uiZoom = document.getElementById('refZoom');
   const uiOp = document.getElementById('refOp');
-
-  // Head 0,0 Center = (122, 145), CELL W = 150.6, CELL H = 180.7
-  const START_CX = 122; const START_CY = 145;
-  const CELL_W = 150.6; const CELL_H = 180.7; 
+  const START_CX = 122; const START_CY = 145; const CELL_W = 150.6; const CELL_H = 180.7; 
   const CONTAINER_CW = 75.5; const CONTAINER_CH = 90.5; 
 
   function updateMatrixView(){
-    // Master Toggle Check
-    if(!uiToggle.checked){
-        refContainer.style.display = 'none';
-        return;
-    }
+    if(!uiToggle.checked){ refContainer.style.display = 'none'; return; }
     refContainer.style.display = 'block';
-
-    const yawVal = parseInt(uiYaw.value);
-    const pitchVal = parseInt(uiPitch.value);
-    const zoomVal = parseFloat(uiZoom.value);
-    const opVal = parseFloat(uiOp.value);
-    
+    const yawVal = parseInt(uiYaw.value); const pitchVal = parseInt(uiPitch.value); const zoomVal = parseFloat(uiZoom.value); const opVal = parseFloat(uiOp.value);
     document.getElementById('vYaw').innerText = (yawVal * 22.5) + "°";
     document.getElementById('vPitch').innerText = (pitchVal * 15) + "°";
     document.getElementById('vRefZoom').innerText = zoomVal.toFixed(2);
     document.getElementById('vRefOp').innerText = opVal.toFixed(2);
-
-    refContainer.style.opacity = opVal;
-    refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
-
+    refContainer.style.opacity = opVal; refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
     const col = yawVal + 4; const row = 3 - pitchVal; 
     const cx = START_CX + col * CELL_W; const cy = START_CY + row * CELL_H;
     const targetX = CONTAINER_CW - cx; const targetY = CONTAINER_CH - cy;
-
     refImage.style.transform = `translate(${targetX}px, ${targetY}px)`;
   }
 
   [uiToggle, uiYaw, uiPitch, uiZoom, uiOp].forEach(el => {
     el.addEventListener('input', updateMatrixView);
-    el.addEventListener('change', updateMatrixView); // For checkbox
+    el.addEventListener('change', updateMatrixView);
   });
 
-  // Init
-  resize(); 
-  addLayer("Line Art");
-  updateMatrixView();
-  setTab('draw'); 
-
+  resize(); addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
 })();
 </script>
 </body>
