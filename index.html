@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Loomis Rotation Lab</title>
+  <title>AnimX</title>
   <style>
     :root{
       --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
@@ -100,7 +100,25 @@
     .moveBtns{ display:flex; flex-direction:column; gap:2px; }
     .moveBtn{ font-size:8px; padding:2px 4px; border:1px solid var(--line); border-radius:4px; cursor:pointer; background:#222; color:#aaa; line-height:1; }
     .moveBtn:hover{ background:var(--accent); color:#000; }
-  </style>
+  
+    /* AnimX: animation panel */
+    .animThumbs{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+    .thumbItem{ border:1px solid var(--line); border-radius:10px; padding:6px; cursor:pointer; background:rgba(255,255,255,0.02); }
+    .thumbItem:hover{ background:rgba(255,255,255,0.04); }
+    .thumbImg{ width:100%; height:70px; background:#0a0d12; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .thumbImg img{ width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
+    .thumbName{ margin-top:6px; font-size:11px; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .animSeq{ display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto; padding-right:4px; }
+    .seqItem{ display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:10px; padding:6px; background:rgba(0,0,0,0.2); cursor:grab; }
+    .seqItem.on{ outline:2px solid var(--accent); }
+    .seqThumb{ width:52px; height:38px; border-radius:8px; overflow:hidden; background:#0a0d12; flex:0 0 auto; }
+    .seqThumb img{ width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
+    .seqLabel{ flex:1; font-size:11px; opacity:0.85; }
+    .seqBtns{ display:flex; gap:6px; }
+    .seqBtn{ font-size:11px; padding:4px 8px; border:1px solid var(--line); border-radius:10px; cursor:pointer; user-select:none; }
+    .seqBtn:hover{ background:rgba(255,255,255,0.04); }
+
+</style>
 </head>
 
 <body>
@@ -110,9 +128,10 @@
   </a>
 
   <div class="tabs">
-    <div class="brand">Loomis Rotation Lab</div>
+    <div class="brand">AnimX</div>
     <div class="tab on" data-tab="draw">DRAW</div>
     <div class="tab" data-tab="export">EXPORT</div>
+    <div class="tab" data-tab="anim">ANIM</div>
   </div>
 
   <a href="https://ko-fi.com/dimproductions" target="_blank" class="support-link">
@@ -129,11 +148,24 @@
         <div class="row">
           <div class="btn active" id="toolPen">G-Pen</div>
           <div class="btn" id="toolEraser">Eraser</div>
+          <div class="btn" id="toolSelect">Select</div>
         </div>
         <div class="row" style="margin-top:8px;">
             <div class="btn small" id="btnUndo">↶ Undo</div>
             <div class="btn small" id="btnRedo">↷ Redo</div>
         </div>
+        <div class="row" style="margin-top:8px;">
+            <div class="btn small" id="btnCopy">⎘ Copy</div>
+            <div class="btn small" id="btnCut">✂ Cut</div>
+            <div class="btn small danger" id="btnDelete">⌫ Delete</div>
+            <div class="btn small" id="btnPaste">⎘ Paste</div>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+            <div class="btn small active" id="dragModeMove">Drag: Move</div>
+            <div class="btn small" id="dragModeCopy">Drag: Copy</div>
+        </div>
+
         
         <div class="sep"></div>
         <h3>PEN SETTINGS</h3>
@@ -171,7 +203,30 @@
       <div id="slot-export" class="tabSlot">
         <h3>EXPORT</h3>
         <div class="btn accent" id="btnExportPNG">Export PNG</div>
+        <div class="btn accent" id="btnExportANIMX">Export .animx</div>
         <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
+      </div>
+
+      <div id="slot-anim" class="tabSlot">
+        <h3>ANIMATION</h3>
+        <div class="row">
+          <div class="btn accent small" id="btnAnimAddFromActive">+ Add Active Layer</div>
+          <div class="btn small" id="btnAnimClear">Clear</div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div class="btn small" id="btnAnimPlay">Play</div>
+          <div class="btn small" id="btnAnimStop">Stop</div>
+        </div>
+        <label style="margin-top:8px;">FPS <span id="vAnimFps">12</span></label>
+        <input id="animFps" type="range" min="1" max="30" value="12" step="1">
+        <label style="margin-top:8px;">Loop (0=∞) <span id="vAnimLoop">0</span></label>
+        <input id="animLoop" type="range" min="0" max="30" value="0" step="1">
+        <div class="sep"></div>
+        <div class="hint" style="font-size:10px; margin-bottom:6px;">Thumbnails = LAYERS. Click to append. Drag in Sequence to reorder.</div>
+        <div class="animThumbs" id="animThumbs"></div>
+        <div class="sep"></div>
+        <h3 style="margin-top:0;">SEQUENCE</h3>
+        <div class="animSeq" id="animSeq"></div>
       </div>
     </div>
 
@@ -204,13 +259,18 @@
 <script>
 (() => {
   const tabs = document.querySelectorAll('.tab');
-  const slots = { draw:document.getElementById('slot-draw'), export:document.getElementById('slot-export') };
+  const slots = { draw:document.getElementById('slot-draw'), export:document.getElementById('slot-export'), anim:document.getElementById('slot-anim') };
   const refContainer = document.getElementById('refContainer'); 
+  let currentTab = 'draw';
 
   function setTab(m){
+    currentTab = m;
     tabs.forEach(t=>t.classList.toggle('on', t.dataset.tab===m));
-    Object.values(slots).forEach(e=>e.classList.remove('on'));
+    Object.values(slots).forEach(e=>e && e.classList.remove('on'));
     if(slots[m]) slots[m].classList.add('on');
+    // Tab-specific view refresh (do not mutate layer content)
+    if(m==='anim'){ updateAnimUI(); renderAnimFrame(activeAnimIdx); }
+    else { stopAnimPlayback(); redrawComposite(); }
   }
   tabs.forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
 
@@ -227,10 +287,24 @@
   window.addEventListener('resize', resize);
 
   let layers=[], activeIdx=0;
+let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
+let selectionPointerId = null; // pointer capture id for select tool
+
+let dragMode = 'move'; // 'move' (cut-move) or 'copy'
+  let lastPointer = {x:0,y:0};
+  let __layerSeq=0;
+  // AnimX animation state (frames reference layer ids)
+  let animFrames=[];
+  let activeAnimIdx=0;
+  let animPlaying=false;
+  let animTimer=null;
+  let animLoopsRemaining=0;
+
   function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
   function addLayer(name){
     const c=makeCanvas(cComp.width, cComp.height);
-    layers.unshift({name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d')});
+    const id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
+    layers.unshift({id, name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d')});
     activeIdx=0; updateLayerUI();
   }
   function moveLayer(idx, dir){
@@ -243,6 +317,7 @@
   function updateLayerUI(){
     const list=document.getElementById('layersList'); list.innerHTML='';
     layers.forEach((L,i)=>{
+      if(!L.id) L.id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
       const el=document.createElement('div');
       el.className=`layerItem ${i===activeIdx?'on':''}`;
       el.innerHTML=`
@@ -257,11 +332,38 @@
       el.onclick=()=>{activeIdx=i; updateLayerUI(); syncLayerOp();};
       list.appendChild(el);
     });
+    updateAnimUI();
     ensureLayerSize(); redrawComposite();
   }
   function redrawComposite(){
     gComp.clearRect(0,0,cComp.width,cComp.height);
     for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
+
+    // Selection overlay (Draw > Select tool)
+    if(currentTab==='draw' && toolType==='select' && selection.active){
+      const nx = Math.min(selection.x, selection.x + selection.w);
+      const ny = Math.min(selection.y, selection.y + selection.h);
+      const nw = Math.abs(selection.w), nh = Math.abs(selection.h);
+      gComp.save();
+      gComp.globalAlpha = 1.0;
+      // High-contrast selection outline (avoid white-on-bright)
+      gComp.setLineDash([6,4]);
+      gComp.lineWidth = 2;
+      // black under-stroke for contrast
+      gComp.strokeStyle = 'rgba(0,0,0,0.85)';
+      gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      // accent over-stroke
+      gComp.lineWidth = 1;
+      gComp.strokeStyle = 'rgba(0,208,255,0.95)';
+      gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      gComp.setLineDash([]);
+      // preview moved content while dragging
+      if(selection.moving && selection.img){
+        gComp.globalAlpha = 0.85;
+        gComp.putImageData(selection.img, nx, ny);
+      }
+      gComp.restore();
+    }
   }
   function ensureLayerSize(){
     layers.forEach(L=>{
@@ -270,6 +372,164 @@
       }
     });
   }
+  // ----------------------------
+  // AnimX: animation UI (frames are references to layer ids)
+  // ----------------------------
+  const elAnimThumbs = document.getElementById('animThumbs');
+  const elAnimSeq = document.getElementById('animSeq');
+  const elAnimFps = document.getElementById('animFps');
+  const elAnimLoop = document.getElementById('animLoop');
+  const vAnimFps = document.getElementById('vAnimFps');
+  const vAnimLoop = document.getElementById('vAnimLoop');
+
+  function getLayerById(id){ return layers.find(L=>L.id===id) || null; }
+
+  function layerThumbURL(L){
+    // Downscale to keep UI light
+    const tw=220, th=140;
+    const t=makeCanvas(tw, th);
+    const g=t.getContext('2d');
+    g.clearRect(0,0,tw,th);
+    const sw=L.canvas.width, sh=L.canvas.height;
+    if(sw>0 && sh>0){
+      const s = Math.min(tw/sw, th/sh);
+      const dw = Math.floor(sw*s), dh = Math.floor(sh*s);
+      const dx = Math.floor((tw-dw)/2), dy = Math.floor((th-dh)/2);
+      g.drawImage(L.canvas, 0,0,sw,sh, dx,dy,dw,dh);
+    }
+    return t.toDataURL('image/png');
+  }
+
+  function updateAnimUI(){
+    if(!elAnimThumbs || !elAnimSeq) return;
+
+    // Thumbnails from LAYERS (right panel)
+    elAnimThumbs.innerHTML='';
+    layers.forEach((L)=>{
+      const item=document.createElement('div');
+      item.className='thumbItem';
+      const src = layerThumbURL(L);
+      item.innerHTML = `
+        <div class="thumbImg"><img draggable="false" src="${src}"></div>
+        <div class="thumbName">${L.name}</div>
+      `;
+      item.onclick=()=>{ animFrames.push(L.id); activeAnimIdx = animFrames.length-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      elAnimThumbs.appendChild(item);
+    });
+
+    // Sequence
+    elAnimSeq.innerHTML='';
+    animFrames.forEach((layerId, idx)=>{
+      const L=getLayerById(layerId);
+      const item=document.createElement('div');
+      item.className = `seqItem ${idx===activeAnimIdx?'on':''}`;
+      item.draggable = true;
+      const src = L ? layerThumbURL(L) : '';
+      const label = L ? L.name : '(missing layer)';
+      item.innerHTML = `
+        <div class="seqThumb">${src?`<img draggable="false" src="${src}">`:''}</div>
+        <div class="seqLabel">${idx+1}. ${label}</div>
+        <div class="seqBtns">
+          <div class="seqBtn" data-act="dup">Copy</div>
+          <div class="seqBtn" data-act="del">Del</div>
+        </div>
+      `;
+      item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+
+      item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+
+      item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
+      item.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+      item.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        const from = Number(e.dataTransfer.getData('text/plain'));
+        const to = idx;
+        if(Number.isNaN(from) || from===to) return;
+        const [moved] = animFrames.splice(from,1);
+        animFrames.splice(to,0,moved);
+        activeAnimIdx = to;
+        updateAnimUI();
+        renderAnimFrame(activeAnimIdx);
+      });
+
+      elAnimSeq.appendChild(item);
+    });
+
+    if(elAnimFps && vAnimFps) vAnimFps.textContent = String(elAnimFps.value|0);
+    if(elAnimLoop && vAnimLoop) vAnimLoop.textContent = String(elAnimLoop.value|0);
+  }
+
+  function renderAnimFrame(idx){
+    if(currentTab!=='anim'){ return; }
+    if(animFrames.length===0){ redrawComposite(); return; }
+    if(idx<0 || idx>=animFrames.length) idx=0;
+    const L = getLayerById(animFrames[idx]);
+    if(!L){ redrawComposite(); return; }
+    gComp.clearRect(0,0,cComp.width,cComp.height);
+    gComp.globalAlpha = 1.0;
+    gComp.drawImage(L.canvas, 0,0);
+  }
+
+  function stopAnimPlayback(){
+    if(animTimer){ clearInterval(animTimer); animTimer=null; }
+    animPlaying=false;
+  }
+
+  function startAnimPlayback(){
+    if(currentTab!=='anim') return;
+    if(animFrames.length===0) return;
+    stopAnimPlayback();
+    animPlaying=true;
+    const fps = Math.max(1, Number(elAnimFps?.value||12));
+    const loop = Number(elAnimLoop?.value||0);
+    animLoopsRemaining = loop;
+    let i = activeAnimIdx||0;
+    const frameMs = Math.floor(1000 / fps);
+    animTimer = setInterval(()=>{
+      if(currentTab!=='anim'){ stopAnimPlayback(); return; }
+      renderAnimFrame(i);
+      i++;
+      if(i>=animFrames.length){
+        i=0;
+        if(loop>0){
+          animLoopsRemaining--;
+          if(animLoopsRemaining<=0){
+            stopAnimPlayback();
+            activeAnimIdx=0;
+            updateAnimUI();
+            renderAnimFrame(activeAnimIdx);
+            return;
+          }
+        }
+      }
+      activeAnimIdx = i;
+      updateAnimUI();
+    }, frameMs);
+  }
+
+  // Anim tab controls
+  const btnAnimAddFromActive = document.getElementById('btnAnimAddFromActive');
+  const btnAnimClear = document.getElementById('btnAnimClear');
+  const btnAnimPlay = document.getElementById('btnAnimPlay');
+  const btnAnimStop = document.getElementById('btnAnimStop');
+
+  btnAnimAddFromActive && (btnAnimAddFromActive.onclick = ()=>{
+    const L = layers[activeIdx];
+    if(!L) return;
+    animFrames.push(L.id);
+    activeAnimIdx = animFrames.length-1;
+    updateAnimUI();
+    renderAnimFrame(activeAnimIdx);
+  });
+  btnAnimClear && (btnAnimClear.onclick = ()=>{ animFrames=[]; activeAnimIdx=0; stopAnimPlayback(); updateAnimUI(); redrawComposite(); });
+  btnAnimPlay && (btnAnimPlay.onclick = ()=>{ startAnimPlayback(); });
+  btnAnimStop && (btnAnimStop.onclick = ()=>{ stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
+
+  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
+  elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
+
+
   function syncLayerOp(){
     if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); }
   }
@@ -307,9 +567,11 @@
 
   let drawing=false, pts=[]; let toolType = 'pen';
   const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
-  document.getElementById('toolPen').onclick=()=>{ toolType='pen'; document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); };
-  document.getElementById('toolEraser').onclick=()=>{ toolType='eraser'; document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); };
-  const bindSet = (id, key, dispId) => {
+  document.getElementById('toolPen').onclick=()=>{ toolType='pen'; document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); const ts=document.getElementById('toolSelect'); if(ts) ts.classList.remove('active'); redrawComposite(); };
+  document.getElementById('toolEraser').onclick=()=>{ toolType='eraser'; document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); const ts=document.getElementById('toolSelect'); if(ts) ts.classList.remove('active'); redrawComposite(); };
+  
+  document.getElementById('toolSelect').onclick=()=>{ toolType='select'; document.getElementById('toolSelect').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); document.getElementById('toolEraser').classList.remove('active'); redrawComposite(); };
+const bindSet = (id, key, dispId) => {
     document.getElementById(id).oninput=(e)=>{ penSettings[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = penSettings[key]; };
   };
   bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); bindSet('penSmooth','smooth','vSmooth'); bindSet('penTaper','taper','vTaper');
@@ -326,24 +588,164 @@
     return settings.size * pressFactor * Math.min(inT, outT);
   }
 
-  cInput.addEventListener('pointerdown', e=>{
-    if(!layers[activeIdx].visible) return; drawing=true; cInput.setPointerCapture(e.pointerId); pts=[{x:e.offsetX, y:e.offsetY, p:e.pressure||0.5}];
-    const ctx = layers[activeIdx].ctx; strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+  
+  // ---- Selection (rect) tool ----
+  function normRect(x,y,w,h){
+    const nx = (w>=0)? x : x+w;
+    const ny = (h>=0)? y : y+h;
+    return { x: Math.max(0, Math.floor(nx)), y: Math.max(0, Math.floor(ny)), w: Math.max(0, Math.floor(Math.abs(w))), h: Math.max(0, Math.floor(Math.abs(h))) };
+  }
+  function pointInRect(px,py,r){ return px>=r.x && py>=r.y && px<=(r.x+r.w) && py<=(r.y+r.h); }
+
+  function beginSelect(e){
+    if(!layers[activeIdx]) return;
+    const r = normRect(selection.x, selection.y, selection.w, selection.h);
+    const inside = selection.active && selection.img && pointInRect(e.offsetX, e.offsetY, r);
+    selection.startX = e.offsetX; selection.startY = e.offsetY;
+    if(inside){
+      selection.moving = true;
+      selection.baseX = selection.x; selection.baseY = selection.y;
+      // remember origin rect for cut-move semantics
+      selection.origin = { x:r.x, y:r.y, w:r.w, h:r.h };
+    }else{
+      selection.active = true;
+      selection.moving = false;
+      selection.img = null;
+      selection.origin = null;
+      selection.x = e.offsetX; selection.y = e.offsetY; selection.w = 0; selection.h = 0;
+    }
+    redrawComposite();
+  }
+
+  function moveSelect(e){
+    if(!selection.active) return;
+    if(selection.moving){
+      const dx = e.offsetX - selection.startX;
+      const dy = e.offsetY - selection.startY;
+      selection.x = selection.baseX + dx;
+      selection.y = selection.baseY + dy;
+    }else{
+      selection.w = e.offsetX - selection.startX;
+      selection.h = e.offsetY - selection.startY;
+    }
+    redrawComposite();
+  }
+
+  function endSelect(e){
+    if(!layers[activeIdx]) return;
+    const ctx = layers[activeIdx].ctx;
+    if(!selection.active) return;
+
+    // finalize rect
+    const r = normRect(selection.x, selection.y, selection.w, selection.h);
+
+    // If we were creating a new selection:
+    if(!selection.moving){
+      if(r.w < 2 || r.h < 2){
+        selection.active = false; selection.img = null;
+        redrawComposite(); return;
+      }
+      selection.x = r.x; selection.y = r.y; selection.w = r.w; selection.h = r.h;
+      try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
+      redrawComposite(); return;
+    }
+
+    // If we were moving: commit move as CUT+PASTE on active layer
+    selection.moving = false;
+    if(!selection.img){
+      // (re-capture if missing)
+      try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
+    }
+    if(!selection.img){ redrawComposite(); return; }
+
+    const before = snapshotLayer(activeIdx);
+
+    // clear original only if dragMode==='move'
+    const prev = selection.origin || normRect(selection.baseX, selection.baseY, selection.w, selection.h);
+    if(dragMode === 'move'){
+      ctx.clearRect(prev.x, prev.y, prev.w, prev.h);
+    }
+
+    // paste at new position (clamped)
+    const nx = Math.max(0, Math.min(cComp.width - selection.img.width, Math.floor(selection.x)));
+    const ny = Math.max(0, Math.min(cComp.height - selection.img.height, Math.floor(selection.y)));
+    ctx.putImageData(selection.img, nx, ny);
+
+    const after = snapshotLayer(activeIdx);
+    recordHistory(before, after, activeIdx);
+
+    selection.x = nx; selection.y = ny; selection.w = selection.img.width; selection.h = selection.img.height;
+    selection.origin = { x:nx, y:ny, w:selection.img.width, h:selection.img.height };
+    redrawComposite();
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(e.key === 'Escape'){
+      if(selection.active){
+        selection.active=false; selection.img=null; selection.moving=false; selection.origin=null;
+        redrawComposite();
+      }
+    }
   });
-  cInput.addEventListener('pointermove', e=>{
+
+  // ---- Drawing / Input ----
+  cInput.addEventListener('pointerdown', e=>{ 
+    if(currentTab!=='draw') return;
+    lastPointer = {x:e.offsetX, y:e.offsetY};
+    if(toolType==='select'){ beginSelect(e); try{ cInput.setPointerCapture(e.pointerId); selectionPointerId = e.pointerId; }catch(_){ } return; }
+    if(!layers[activeIdx].visible) return; 
+    drawing=true; 
+    cInput.setPointerCapture(e.pointerId); 
+    pts=[{x:e.offsetX, y:e.offsetY, p:e.pressure||0.5}];
+    const ctx = layers[activeIdx].ctx; 
+    strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+  });
+
+  cInput.addEventListener('pointermove', e=>{ 
+    if(currentTab!=='draw') return;
+    lastPointer = {x:e.offsetX, y:e.offsetY};
+    if(toolType==='select'){ moveSelect(e); return; }
+ if(currentTab!=='draw') return;
     if(!drawing) return; const raw={x:e.offsetX, y:e.offsetY, p:e.pressure||0.5};
     const k = 1.0 - penSettings.smooth; const last = pts[pts.length-1];
     pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
     drawPreview(gInput, pts);
   });
-  const endStroke = ()=>{
+
+const endStroke = ()=>{
     if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
     ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over';
     drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
     gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
     if(strokeStartData){ recordHistory(strokeStartData, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx); strokeStartData = null; }
   };
-  cInput.addEventListener('pointerup', endStroke);
+
+  cInput.addEventListener('pointerup', e=>{
+    if(currentTab!=='draw') return;
+    lastPointer = {x:e.offsetX, y:e.offsetY};
+    if(toolType==='select'){ endSelect(e); if(selectionPointerId!==null){ try{ cInput.releasePointerCapture(selectionPointerId);}catch(_){ } selectionPointerId=null; } return; }
+    endStroke();
+  });
+
+  // Ensure selection finalizes even if pointerup/cancel happens off-canvas
+  cInput.addEventListener('pointercancel', e=>{
+    if(currentTab!=='draw') return;
+    if(toolType==='select'){
+      endSelect(e);
+      if(selectionPointerId!==null){ try{ cInput.releasePointerCapture(selectionPointerId);}catch(_){ } selectionPointerId=null; }
+    } else {
+      endStroke();
+    }
+  });
+  cInput.addEventListener('lostpointercapture', e=>{
+    if(currentTab!=='draw') return;
+    if(toolType==='select' && selection.active){
+      // finalize selection/move on capture loss
+      endSelect(e);
+      selectionPointerId=null;
+    }
+  });
+
 
   function drawStroke(ctx, points){
     if(points.length<2) return; const {lens, total} = getStrokeLengths(points);
@@ -383,6 +785,165 @@
     for(let i=layers.length-1;i>=0;i--){ if(layers[i].visible) x.drawImage(layers[i].canvas,0,0); }
     const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
   };
+  // ---- Clipboard (layer bitmap) ----
+  let __clipboard = null; // {w,h,data:ImageData}
+  function snapshotLayer(idx){
+    if(!layers[idx]) return null;
+    const ctx = layers[idx].ctx;
+    return ctx.getImageData(0,0,cComp.width,cComp.height);
+  }
+  function setLayerFromImageData(idx, img){
+    if(!layers[idx]) return;
+    layers[idx].ctx.putImageData(img, 0, 0);
+    redrawComposite();
+  }
+  function doCopy(){
+    if(!layers[activeIdx]) return;
+    const ctx = layers[activeIdx].ctx;
+    if(selection.active && selection.img){
+      __clipboard = { kind:'rect', w: selection.img.width, h: selection.img.height, data: selection.img };
+    }else{
+      const img = snapshotLayer(activeIdx);
+      __clipboard = { kind:'full', w: img.width, h: img.height, data: img };
+    }
+  }
+  function doCut(){
+    if(!layers[activeIdx]) return;
+    const ctx = layers[activeIdx].ctx;
+    const before = snapshotLayer(activeIdx);
+
+    if(selection.active && selection.img){
+      const r = normRect(selection.x, selection.y, selection.w, selection.h);
+      try{
+        const img = ctx.getImageData(r.x, r.y, r.w, r.h);
+        __clipboard = { kind:'rect', w: img.width, h: img.height, data: img };
+        ctx.clearRect(r.x, r.y, r.w, r.h);
+      }catch(_){}
+    }else{
+      const img = before;
+      __clipboard = { kind:'full', w: img.width, h: img.height, data: img };
+      ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
+    }
+
+    const after = snapshotLayer(activeIdx);
+    recordHistory(before, after, activeIdx);
+    redrawComposite();
+  }
+  function doPaste(){
+    if(!__clipboard || !layers[activeIdx]) return;
+    const ctx = layers[activeIdx].ctx;
+    const before = snapshotLayer(activeIdx);
+
+    if(__clipboard.kind === 'rect'){
+      // Paste at selection top-left if selection exists, else at last pointer.
+      const px = (selection.active) ? Math.floor(selection.x) : Math.floor(lastPointer.x || 0);
+      const py = (selection.active) ? Math.floor(selection.y) : Math.floor(lastPointer.y || 0);
+      const nx = Math.max(0, Math.min(ctx.canvas.width - __clipboard.w, px));
+      const ny = Math.max(0, Math.min(ctx.canvas.height - __clipboard.h, py));
+      ctx.putImageData(__clipboard.data, nx, ny);
+
+      // update selection to pasted region
+      selection.active = true;
+      selection.moving = false;
+      selection.x = nx; selection.y = ny; selection.w = __clipboard.w; selection.h = __clipboard.h;
+      // recapture from layer (ensures consistency)
+      try{ selection.img = ctx.getImageData(nx, ny, __clipboard.w, __clipboard.h); }catch(_){ selection.img=null; }
+    }else{
+      ctx.putImageData(__clipboard.data, 0, 0);
+      selection.active = false; selection.img = null; selection.moving = false;
+    }
+
+    const after = snapshotLayer(activeIdx);
+    recordHistory(before, after, activeIdx);
+    redrawComposite();
+  }
+  document.getElementById('btnCopy').onclick = doCopy;
+  document.getElementById('btnCut').onclick = doCut;
+  document.getElementById('btnDelete').onclick = ()=>{
+    if(!layers[activeIdx]) return;
+    const ctx = layers[activeIdx].ctx;
+    const before = snapshotLayer(activeIdx);
+    if(selection.active && selection.img){
+      const r = normRect(selection.x, selection.y, selection.w, selection.h);
+      ctx.clearRect(r.x, r.y, r.w, r.h);
+      selection.active = false; selection.img=null; selection.moving=false; selection.origin=null;
+    }else{
+      ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
+    }
+    const after = snapshotLayer(activeIdx);
+    recordHistory(before, after, activeIdx);
+    redrawComposite();
+  };
+  document.getElementById('btnPaste').onclick = doPaste;
+
+  // Drag mode toggle for Select tool
+  const elDragMove = document.getElementById('dragModeMove');
+  const elDragCopy = document.getElementById('dragModeCopy');
+  function syncDragModeUI(){
+    if(!elDragMove || !elDragCopy) return;
+    elDragMove.classList.toggle('active', dragMode==='move');
+    elDragCopy.classList.toggle('active', dragMode==='copy');
+  }
+  if(elDragMove) elDragMove.onclick = ()=>{ dragMode='move'; syncDragModeUI(); };
+  if(elDragCopy) elDragCopy.onclick = ()=>{ dragMode='copy'; syncDragModeUI(); };
+  syncDragModeUI();
+
+  // Keyboard shortcuts: Ctrl/Cmd + C/X/V
+  window.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if(!mod) return;
+    const k = (e.key || '').toLowerCase();
+    if(k === 'c'){ e.preventDefault(); doCopy(); }
+    if(k === 'x'){ e.preventDefault(); doCut(); }
+    if(k === 'v'){ e.preventDefault(); doPaste(); }
+  });
+
+  // ---- AnimX export (.animx) ----
+  function downloadBlob(filename, blob){
+    const a=document.createElement('a');
+    a.download=filename;
+    a.href=URL.createObjectURL(blob);
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+  function buildAnimxProject(){
+    const traceEnabled = uiToggle?.checked ?? true;
+    const yaw = Number(uiYaw?.value ?? 0);
+    const pitch = Number(uiPitch?.value ?? 0);
+    const zoom = Number(uiZoom?.value ?? 1);
+    const op = Number(uiOp?.value ?? 0.35);
+    const fps = Number(document.getElementById('animFps')?.value ?? 12);
+    const loop = Number(document.getElementById('animLoop')?.value ?? 0);
+
+    // Layers: store as PNG for deterministic roundtrip
+    const layerPayload = layers.map(l => ({
+      id: l.id,
+      name: l.name,
+      visible: !!l.visible,
+      opacity: Number(l.opacity ?? 1),
+      png: l.canvas.toDataURL('image/png')
+    }));
+
+    return {
+      magic: "ANIMX_PROJECT",
+      schema_version: 1,
+      created_at: new Date().toISOString(),
+      canvas: { w: cComp.width, h: cComp.height },
+      trace: { enabled: traceEnabled, yaw, pitch, zoom, opacity: op },
+      layers: layerPayload,
+      anim: { fps, loop, frames: [...animFrames] },
+      ui: { active_layer_id: layers[activeIdx]?.id ?? null, active_frame_index: activeAnimIdx }
+    };
+  }
+  document.getElementById('btnExportANIMX').onclick=()=>{
+    const proj = buildAnimxProject();
+    const text = JSON.stringify(proj);
+    const blob = new Blob([text], {type:'application/json'});
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    downloadBlob(`project_${ts}.animx`, blob);
+  };
+
 
   const refImage = document.getElementById('refImage');
   const uiToggle = document.getElementById('refToggle');
