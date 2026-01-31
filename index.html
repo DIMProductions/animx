@@ -130,7 +130,7 @@
   <div class="tabs">
     <div class="brand">AnimX</div>
     <div class="tab on" data-tab="draw">DRAW</div>
-    <div class="tab" data-tab="export">EXPORT</div>
+    <div class="tab" data-tab="export">INPORT/EXPORT</div>
     <div class="tab" data-tab="anim">ANIM</div>
   </div>
 
@@ -202,17 +202,16 @@
 
       <div id="slot-export" class="tabSlot">
         <h3>EXPORT</h3>
-        <div class="btn accent" id="btnExportPNG">Export PNG</div>
+        <div class="btn accent" id="btnImportANIMX">Import .animx</div>
         <div class="btn accent" id="btnExportANIMX">Export .animx</div>
+        <div class="btn accent" id="btnExportPNG">Export PNG</div>
+        <input id="fileImportAnimx" type="file" accept=".animx,application/json" style="display:none" />
+        <div class="btn accent" id="btnExportAnimWebP">Export Animated WebP</div>
         <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
       </div>
 
       <div id="slot-anim" class="tabSlot">
         <h3>ANIMATION</h3>
-        <div class="row">
-          <div class="btn accent small" id="btnAnimAddFromActive">+ Add Active Layer</div>
-          <div class="btn small" id="btnAnimClear">Clear</div>
-        </div>
         <div class="row" style="margin-top:8px;">
           <div class="btn small" id="btnAnimPlay">Play</div>
           <div class="btn small" id="btnAnimStop">Stop</div>
@@ -509,24 +508,13 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
   }
 
   // Anim tab controls
-  const btnAnimAddFromActive = document.getElementById('btnAnimAddFromActive');
-  const btnAnimClear = document.getElementById('btnAnimClear');
   const btnAnimPlay = document.getElementById('btnAnimPlay');
   const btnAnimStop = document.getElementById('btnAnimStop');
 
-  btnAnimAddFromActive && (btnAnimAddFromActive.onclick = ()=>{
-    const L = layers[activeIdx];
-    if(!L) return;
-    animFrames.push(L.id);
-    activeAnimIdx = animFrames.length-1;
-    updateAnimUI();
-    renderAnimFrame(activeAnimIdx);
-  });
-  btnAnimClear && (btnAnimClear.onclick = ()=>{ animFrames=[]; activeAnimIdx=0; stopAnimPlayback(); updateAnimUI(); redrawComposite(); });
   btnAnimPlay && (btnAnimPlay.onclick = ()=>{ startAnimPlayback(); });
   btnAnimStop && (btnAnimStop.onclick = ()=>{ stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
 
-  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
+elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
   elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
 
 
@@ -598,10 +586,12 @@ const bindSet = (id, key, dispId) => {
   function pointInRect(px,py,r){ return px>=r.x && py>=r.y && px<=(r.x+r.w) && py<=(r.y+r.h); }
 
   function beginSelect(e){
+    const p = evPos(e, cInput);
+
     if(!layers[activeIdx]) return;
     const r = normRect(selection.x, selection.y, selection.w, selection.h);
-    const inside = selection.active && selection.img && pointInRect(e.offsetX, e.offsetY, r);
-    selection.startX = e.offsetX; selection.startY = e.offsetY;
+    const inside = selection.active && selection.img && pointInRect(p.x, p.y, r);
+    selection.startX = p.x; selection.startY = p.y;
     if(inside){
       selection.moving = true;
       selection.baseX = selection.x; selection.baseY = selection.y;
@@ -612,21 +602,23 @@ const bindSet = (id, key, dispId) => {
       selection.moving = false;
       selection.img = null;
       selection.origin = null;
-      selection.x = e.offsetX; selection.y = e.offsetY; selection.w = 0; selection.h = 0;
+      selection.x = p.x; selection.y = p.y; selection.w = 0; selection.h = 0;
     }
     redrawComposite();
   }
 
   function moveSelect(e){
+    const p = evPos(e, cInput);
+
     if(!selection.active) return;
     if(selection.moving){
-      const dx = e.offsetX - selection.startX;
-      const dy = e.offsetY - selection.startY;
+      const dx = p.x - selection.startX;
+      const dy = p.y - selection.startY;
       selection.x = selection.baseX + dx;
       selection.y = selection.baseY + dy;
     }else{
-      selection.w = e.offsetX - selection.startX;
-      selection.h = e.offsetY - selection.startY;
+      selection.w = p.x - selection.startX;
+      selection.h = p.y - selection.startY;
     }
     redrawComposite();
   }
@@ -689,24 +681,32 @@ const bindSet = (id, key, dispId) => {
   });
 
   // ---- Drawing / Input ----
+  function evPos(e, canvas){
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  }
+
   cInput.addEventListener('pointerdown', e=>{ 
     if(currentTab!=='draw') return;
-    lastPointer = {x:e.offsetX, y:e.offsetY};
+    const p = evPos(e, cInput);
+    lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ beginSelect(e); try{ cInput.setPointerCapture(e.pointerId); selectionPointerId = e.pointerId; }catch(_){ } return; }
     if(!layers[activeIdx].visible) return; 
     drawing=true; 
     cInput.setPointerCapture(e.pointerId); 
-    pts=[{x:e.offsetX, y:e.offsetY, p:e.pressure||0.5}];
+    pts=[{x:p.x, y:p.y, p:e.pressure||0.5}];
     const ctx = layers[activeIdx].ctx; 
     strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
   });
 
   cInput.addEventListener('pointermove', e=>{ 
     if(currentTab!=='draw') return;
-    lastPointer = {x:e.offsetX, y:e.offsetY};
+    const p = evPos(e, cInput);
+    lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ moveSelect(e); return; }
- if(currentTab!=='draw') return;
-    if(!drawing) return; const raw={x:e.offsetX, y:e.offsetY, p:e.pressure||0.5};
+    if(!drawing) return; const raw={x:p.x, y:p.y, p:e.pressure||0.5};
     const k = 1.0 - penSettings.smooth; const last = pts[pts.length-1];
     pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
     drawPreview(gInput, pts);
@@ -722,7 +722,8 @@ const endStroke = ()=>{
 
   cInput.addEventListener('pointerup', e=>{
     if(currentTab!=='draw') return;
-    lastPointer = {x:e.offsetX, y:e.offsetY};
+    const p = evPos(e, cInput);
+    lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ endSelect(e); if(selectionPointerId!==null){ try{ cInput.releasePointerCapture(selectionPointerId);}catch(_){ } selectionPointerId=null; } return; }
     endStroke();
   });
@@ -749,12 +750,13 @@ const endStroke = ()=>{
 
   function drawStroke(ctx, points){
     if(points.length<2) return; const {lens, total} = getStrokeLengths(points);
+    const strength = (toolType === 'eraser') ? 2.4 : 1.0;
     ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
     for(let i=1; i<points.length; i++){
       const t0 = lens[i-1]/total, t1 = lens[i]/total;
       const w0 = getWidthAt(t0, points[i-1].p, penSettings), w1 = getWidthAt(t1, points[i].p, penSettings);
       ctx.beginPath(); ctx.moveTo(points[i-1].x, points[i-1].y); ctx.lineTo(points[i].x, points[i].y);
-      ctx.lineWidth = (w0+w1)*0.5; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.lineWidth = ((w0+w1)*0.5) * strength; ctx.strokeStyle = '#000'; ctx.stroke();
       ctx.beginPath(); ctx.arc(points[i].x, points[i].y, w1/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
     }
   }
@@ -943,6 +945,243 @@ const endStroke = ()=>{
     const ts = new Date().toISOString().replace(/[:.]/g,'-');
     downloadBlob(`project_${ts}.animx`, blob);
   };
+
+  // ---- AnimX import (.animx) ----
+  const fileImportAnimx = document.getElementById('fileImportAnimx');
+  const btnImportANIMX = document.getElementById('btnImportANIMX');
+
+  function isValidAnimxProject(obj){
+    return obj && typeof obj === 'object' && obj.magic === 'ANIMX_PROJECT' && Number(obj.schema_version) === 1
+      && obj.canvas && typeof obj.canvas.w === 'number' && typeof obj.canvas.h === 'number'
+      && Array.isArray(obj.layers);
+  }
+
+  function loadImage(dataUrl){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = ()=>reject(new Error('image_load_failed'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function applyAnimxProject(proj){
+    if(!isValidAnimxProject(proj)) throw new Error('invalid_animx');
+
+    // Set logical canvas resolution to project size
+    cComp.width = cInput.width = Math.max(1, Math.floor(proj.canvas.w));
+    cComp.height = cInput.height = Math.max(1, Math.floor(proj.canvas.h));
+    gComp.clearRect(0,0,cComp.width,cComp.height);
+    gInput.clearRect(0,0,cInput.width,cInput.height);
+
+    // Rebuild layers
+    layers = [];
+    __layerSeq = 0;
+    for(const L of proj.layers){
+      const c = makeCanvas(cComp.width, cComp.height);
+      const ctx = c.getContext('2d');
+      // best-effort restore image (no smoothing for pixel art; fine for rough)
+      try{
+        const img = await loadImage(L.png);
+        ctx.imageSmoothingEnabled = true;
+        ctx.clearRect(0,0,c.width,c.height);
+        ctx.drawImage(img, 0,0, c.width, c.height);
+      }catch(_){
+        // keep empty layer if image load fails
+      }
+      layers.push({
+        id: String(L.id || `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`),
+        name: String(L.name || 'Layer'),
+        visible: !!L.visible,
+        opacity: Number.isFinite(Number(L.opacity)) ? Number(L.opacity) : 1,
+        canvas: c,
+        ctx
+      });
+    }
+
+    // Restore UI state
+    const wanted = proj.ui?.active_layer_id || null;
+    activeIdx = Math.max(0, layers.findIndex(x=>x.id===wanted));
+    if(activeIdx < 0) activeIdx = 0;
+
+    // Trace / reference
+    if(proj.trace){
+      uiToggle.checked = !!proj.trace.enabled;
+      uiYaw.value = String(Number(proj.trace.yaw ?? 0));
+      uiPitch.value = String(Number(proj.trace.pitch ?? 0));
+      uiZoom.value = String(Number(proj.trace.zoom ?? 5));
+      uiOp.value = String(Number(proj.trace.opacity ?? 0.5));
+    }
+    updateMatrixView();
+
+    // Anim
+    animFrames = Array.isArray(proj.anim?.frames) ? proj.anim.frames.map(String) : [];
+    activeAnimIdx = Math.max(0, Math.min(Number(proj.ui?.active_frame_index ?? 0), Math.max(0, animFrames.length-1)));
+    if(proj.anim){
+      const fps = Math.max(1, Math.min(30, Number(proj.anim.fps ?? 12)));
+      const loop = Math.max(0, Math.min(30, Number(proj.anim.loop ?? 0)));
+      const elFps = document.getElementById('animFps');
+      const elLoop = document.getElementById('animLoop');
+      if(elFps) elFps.value = String(fps);
+      if(elLoop) elLoop.value = String(loop);
+    }
+
+    stopAnimPlayback();
+    history = []; historyStep = -1; updateUndoUI();
+
+    updateLayerUI();
+    setTab('draw');
+  }
+
+  btnImportANIMX && (btnImportANIMX.onclick = ()=>{ fileImportAnimx && fileImportAnimx.click(); });
+  fileImportAnimx && fileImportAnimx.addEventListener('change', async ()=>{
+    const f = fileImportAnimx.files && fileImportAnimx.files[0];
+    if(!f) return;
+    try{
+      const text = await f.text();
+      const obj = JSON.parse(text);
+      await applyAnimxProject(obj);
+    }catch(err){
+      alert('Import failed: ' + (err && err.message ? err.message : 'unknown'));
+    }finally{
+      fileImportAnimx.value = '';
+    }
+  });
+
+  // ---- Export animation as a single Animated WebP ----
+  function u32le(v){ return [v&255,(v>>8)&255,(v>>16)&255,(v>>24)&255]; }
+  function u16le(v){ return [v&255,(v>>8)&255]; }
+  function u24le(v){ return [v&255,(v>>8)&255,(v>>16)&255]; }
+  function str4(s){ return [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)]; }
+
+  function readU32LE(d, o){ return (d[o]) | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24); }
+
+  function parseWebPImageChunks(arrayBuffer){
+    const d = new Uint8Array(arrayBuffer);
+    if(String.fromCharCode(...d.slice(0,4)) !== 'RIFF' || String.fromCharCode(...d.slice(8,12)) !== 'WEBP'){
+      throw new Error('Not a WebP RIFF');
+    }
+    let off = 12;
+    const chunks = [];
+    while(off + 8 <= d.length){
+      const tag = String.fromCharCode(...d.slice(off, off+4));
+      const size = readU32LE(d, off+4);
+      const dataStart = off + 8;
+      const dataEnd = dataStart + size;
+      if(dataEnd > d.length) break;
+      if(tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH'){
+        chunks.push({tag, data: d.slice(dataStart, dataEnd)});
+      }
+      off = dataEnd + (size % 2); // pad to even
+    }
+    if(chunks.length === 0) throw new Error('No VP8/VP8L chunk found');
+    return chunks;
+  }
+
+  function makeChunk(tag, dataBytes){
+    const size = dataBytes.length;
+    const pad = size % 2;
+    const out = new Uint8Array(8 + size + pad);
+    out.set(str4(tag), 0);
+    out.set(u32le(size), 4);
+    out.set(dataBytes, 8);
+    // pad byte already zero
+    return out;
+  }
+
+  function buildAnimatedWebP({width, height, loopCount, frames}){
+    // Determine alpha flag
+    let hasAlpha = false;
+    for(const f of frames){
+      for(const c of f.chunks){
+        if(c.tag === 'ALPH' || c.tag === 'VP8L'){ hasAlpha = true; break; }
+      }
+      if(hasAlpha) break;
+    }
+
+    // VP8X flags: bit1 animation, bit4 alpha
+    const flags = (1<<1) | (hasAlpha ? (1<<4) : 0);
+    const vp8xPayload = new Uint8Array([
+      flags, 0,0,0,
+      ...u24le(width-1),
+      ...u24le(height-1),
+    ]);
+    const chunksOut = [];
+    chunksOut.push(makeChunk('VP8X', vp8xPayload));
+
+    // ANIM chunk: bgcolor (ARGB little-endian) + loop count (0=inf)
+    const animPayload = new Uint8Array([
+      0,0,0,0,
+      ...u16le(loopCount),
+    ]);
+    chunksOut.push(makeChunk('ANIM', animPayload));
+
+    for(const f of frames){
+      const x=0,y=0,w=width,h=height;
+      const duration = Math.max(1, Math.min(0xFFFFFF, f.durationMs|0));
+      const frameHdr = new Uint8Array([
+        ...u24le(x), ...u24le(y),
+        ...u24le(w-1), ...u24le(h-1),
+        ...u24le(duration),
+        0x00 // flags: blend=0 (blend), dispose=0 (none)
+      ]);
+      // Compose frame chunk payload: 16-byte header + image subchunks
+      let payloadParts = [frameHdr];
+      for(const c of f.chunks){
+        payloadParts.push(makeChunk(c.tag, c.data));
+      }
+      const total = payloadParts.reduce((s,a)=>s+a.length, 0);
+      const payload = new Uint8Array(total);
+      let o=0;
+      for(const part of payloadParts){ payload.set(part, o); o += part.length; }
+      chunksOut.push(makeChunk('ANMF', payload));
+    }
+
+    const riffSize = 4 + chunksOut.reduce((s,c)=>s+c.length,0);
+    const out = new Uint8Array(8 + riffSize);
+    out.set(str4('RIFF'),0);
+    out.set(u32le(riffSize),4);
+    out.set(str4('WEBP'),8);
+    let o=12;
+    for(const c of chunksOut){ out.set(c,o); o+=c.length; }
+    return out;
+  }
+
+  async function exportAnimationAnimatedWebP(){
+    if(animFrames.length === 0){
+      alert('No frames in SEQUENCE.');
+      return;
+    }
+    const w = cComp.width, h = cComp.height;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d');
+
+    const frames = [];
+    const durationMs = Math.round(1000 / Math.max(1, animFps|0));
+
+    for(const layerId of animFrames){
+      const li = layers.findIndex(l=>l.id===layerId);
+      if(li < 0) continue;
+      tctx.clearRect(0,0,w,h);
+      tctx.drawImage(layers[li].canvas, 0, 0);
+      const blob = await new Promise(res=> tmp.toBlob(res, 'image/webp', 0.92));
+      if(!blob){ throw new Error('WebP export not supported'); }
+      const ab = await blob.arrayBuffer();
+      const chunks = parseWebPImageChunks(ab);
+      frames.push({chunks, durationMs});
+    }
+
+    const loopCount = (animLoop === 0) ? 0 : Math.max(1, animLoop|0);
+    const webpBytes = buildAnimatedWebP({width:w, height:h, loopCount, frames});
+    const outBlob = new Blob([webpBytes], {type:'image/webp'});
+
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    downloadBlob(`AnimX_${ts}.webp`, outBlob);
+  }
+  const btnExportAnimWebP = document.getElementById('btnExportAnimWebP');
+  btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
+
 
 
   const refImage = document.getElementById('refImage');
