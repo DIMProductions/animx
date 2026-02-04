@@ -10,7 +10,7 @@ It is intended for animators and illustrators who need a lightweight, distractio
 > **AnimX is the first lightweight web tool to implement a "Pinching Index" based Watercolor Shadow engine —
 > enabling realistic pigment stacking and bleed effects purely in the browser.**
 
-PV18 runs entirely locally (Zero-Server) and saves data to open JSON formats.
+AnimX runs entirely locally (Zero-Server) and saves data to open JSON formats.
 
 ---
 
@@ -21,6 +21,7 @@ PV18 runs entirely locally (Zero-Server) and saves data to open JSON formats.
 * **Watercolor Shadow (AnimX’s signature feature)**
 * **Matrix Trace (Loomis-style 3D Grid)**
 * **Timeline & Sequence Management**
+* **Project Save & Load (.animx JSON)**
 * **Native WebP & PNG Export**
 * **GPU-Accelerated Canvas** (`willReadFrequently` optimized)
 * **Smart Undo/Redo System**
@@ -64,7 +65,8 @@ AnimX fills that gap by offering:
 
 1. **Immediacy** — Opens in < 1 second.
 2. **Focus** — Tools are limited to *what you actually need* (Ink, Shadow, Erase).
-3. **Structure** — The Matrix Trace forces correct perspective from frame 1.
+3. **Continuity** — Save your progress instantly as `.animx` and resume anywhere.
+4. **Structure** — The Matrix Trace forces correct perspective from frame 1.
 
 Complex animation becomes manageable because the tool removes the friction of file management and heavy UI.
 
