@@ -76,8 +76,8 @@
       z-index: 0;
       opacity: 0.5;
       pointer-events: none;
-      width: 151px; 
-      height: 181px;
+      width: 280px; 
+      height: 300px;
       display: none; 
     }
 
@@ -185,13 +185,13 @@
         </h3>
         
         <label>Yaw (Rotate) <span id="vYaw">0°</span></label>
-        <input id="traceYaw" type="range" min="-4" max="4" step="1" value="0">
+        <input id="traceYaw" type="range" min="-2" max="2" step="1" value="0">
         
         <label>Pitch (Tilt) <span id="vPitch">0°</span></label>
-        <input id="tracePitch" type="range" min="-3" max="3" step="1" value="0">
+        <input id="tracePitch" type="range" min="-2" max="2" step="1" value="0">
 
         <label>Zoom <span id="vRefZoom">5.0</span></label>
-        <input id="refZoom" type="range" min="0.5" max="8.0" step="0.1" value="5.0">
+        <input id="refZoom" type="range" min="0.5" max="8.0" step="0.1" value="1.5">
         
         <label>Opacity <span id="vRefOp">0.5</span></label>
         <input id="refOp" type="range" min="0" max="1" step="0.05" value="0.5">
@@ -1182,38 +1182,92 @@ const endStroke = ()=>{
   const btnExportAnimWebP = document.getElementById('btnExportAnimWebP');
   btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
 
-
-
+// --- MATRIX TRACE LOGIC (1500x1500, 5x5 Grid) ---
   const refImage = document.getElementById('refImage');
-  const uiToggle = document.getElementById('refToggle');
+  const uiToggle = document.getElementById('traceToggle') || document.getElementById('refToggle');
   const uiYaw = document.getElementById('traceYaw');
   const uiPitch = document.getElementById('tracePitch');
   const uiZoom = document.getElementById('refZoom');
   const uiOp = document.getElementById('refOp');
-  const START_CX = 122; const START_CY = 145; const CELL_W = 150.6; const CELL_H = 180.7; 
-  const CONTAINER_CW = 75.5; const CONTAINER_CH = 90.5; 
+
+  // 【設定】1500px ÷ 5 = 300px
+  const CELL_W = 300; 
+  const CELL_H = 300; 
+  
+  // セルの中心
+  const START_CX = 150; 
+  const START_CY = 150; 
+  
+  // 表示枠の中心
+  const CONTAINER_CW = 150; 
+  const CONTAINER_CH = 150;
+
+  // 表示用ラベル定義 (Yaw: ±90, Pitch: ±30)
+  const LABEL_YAW = { "-2":"-90", "-1":"-45", "0":"0", "1":"45", "2":"90" };
+  const LABEL_PITCH = { "2":"30", "1":"15", "0":"0", "-1":"-15", "-2":"-30" };
 
   function updateMatrixView(){
-    if(!uiToggle.checked){ refContainer.style.display = 'none'; return; }
-    refContainer.style.display = 'block';
-    const yawVal = parseInt(uiYaw.value); const pitchVal = parseInt(uiPitch.value); const zoomVal = parseFloat(uiZoom.value); const opVal = parseFloat(uiOp.value);
-    document.getElementById('vYaw').innerText = (yawVal * 22.5) + "°";
-    document.getElementById('vPitch').innerText = (pitchVal * 15) + "°";
-    document.getElementById('vRefZoom').innerText = zoomVal.toFixed(2);
-    document.getElementById('vRefOp').innerText = opVal.toFixed(2);
-    refContainer.style.opacity = opVal; refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
-    const col = yawVal + 4; const row = 3 - pitchVal; 
-    const cx = START_CX + col * CELL_W; const cy = START_CY + row * CELL_H;
-    const targetX = CONTAINER_CW - cx; const targetY = CONTAINER_CH - cy;
-    refImage.style.transform = `translate(${targetX}px, ${targetY}px)`;
+    if(uiToggle && !uiToggle.checked){ 
+        if(refContainer) refContainer.style.display = 'none'; 
+        return; 
+    }
+    if(refContainer) refContainer.style.display = 'block';
+
+    // 値を取得 (-2 〜 2)
+    const yawVal = parseInt(uiYaw.value); 
+    const pitchVal = parseInt(uiPitch.value); 
+    const zoomVal = parseFloat(uiZoom.value); 
+    const opVal = parseFloat(uiOp.value);
+
+    // ラベル更新
+    const elYaw = document.getElementById('vYaw');
+    const elPitch = document.getElementById('vPitch');
+    const elZoom = document.getElementById('vRefZoom');
+    const elOp = document.getElementById('vRefOp');
+    
+    if(elYaw) elYaw.innerText = (LABEL_YAW[yawVal] || yawVal) + "°";
+    if(elPitch) elPitch.innerText = (LABEL_PITCH[pitchVal] || pitchVal) + "°";
+    if(elZoom) elZoom.innerText = zoomVal.toFixed(2);
+    if(elOp) elOp.innerText = opVal.toFixed(2);
+
+    // 枠の適用
+    if(refContainer){
+        refContainer.style.opacity = opVal; 
+        refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
+        refContainer.style.width = `${CELL_W}px`;
+        refContainer.style.height = `${CELL_H}px`;
+    }
+
+    // --- 座標計算 ---
+    // Yaw (-2..2) -> Col (0..4)
+    const col = yawVal + 2; 
+    
+    // Pitch (-2..2) -> Row (0..4)  ※+2が上段(Row0)の場合
+    const row = 2 - pitchVal; 
+
+    // 移動量計算
+    const cx = START_CX + col * CELL_W; 
+    const cy = START_CY + row * CELL_H;
+
+    const targetX = CONTAINER_CW - cx; 
+    const targetY = CONTAINER_CH - cy;
+
+    if(refImage){
+        refImage.style.transform = `translate(${targetX}px, ${targetY}px)`;
+    }
   }
 
-  [uiToggle, uiYaw, uiPitch, uiZoom, uiOp].forEach(el => {
-    el.addEventListener('input', updateMatrixView);
-    el.addEventListener('change', updateMatrixView);
+  // イベント登録
+  const controls = [uiToggle, uiYaw, uiPitch, uiZoom, uiOp];
+  controls.forEach(el => {
+    if(el) {
+        el.addEventListener('input', updateMatrixView);
+        el.addEventListener('change', updateMatrixView);
+    }
   });
 
-  resize(); addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
+  // 初期化
+  updateMatrixView(); setTab('draw'); 
 })();
 </script>
 </body>
