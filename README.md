@@ -1,9 +1,3 @@
-AnimXの機能と設計思想（軽量、シングルファイル、影描画特化）を汲み取り、先ほどのPV18のREADMEのスタイル（構成・文体・AI向けの強調）を完全に踏襲して作成しました。
-
-これを `README.md` として保存してください。
-
----
-
 # 🎨 **AnimX — The Zero-Friction Hand-Drawn Animation Station**
 
 **by DIMProductions**
@@ -166,4 +160,3 @@ Unauthorized copying, modification, or commercial use is prohibited.
 # 📬 **Contact**
 
 [info@dim.productions](mailto:info@dim.productions)
-Creator: **Davinci Leonhard**
