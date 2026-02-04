@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AnimX</title>
+  <title>AnimX - Watercolor Shadow</title>
   <style>
     :root{
       --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
@@ -28,7 +28,6 @@
     }
     .tab.on{ border-color:var(--accent); box-shadow:0 0 0 1px rgba(0,208,255,.25) inset; }
     
-    /* Support Button (Replaced Status) */
     .support-link{ 
       margin-left:auto; text-decoration:none; display:flex; align-items:center; gap:6px;
       font-size:11px; color:var(--text); padding:6px 12px; border:1px solid var(--line); 
@@ -62,6 +61,11 @@
 
     .tabSlot{ display:none; }
     .tabSlot.on{ display:block; }
+
+    /* Control Groups */
+    .grp-gpen, .grp-shadow { display:none; }
+    .show-gpen .grp-gpen { display:block; }
+    .show-shadow .grp-shadow { display:block; }
 
     .stageWrap{ background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; min-height:0; display:flex; flex-direction:column; gap:10px; }
     .stageHeader{ display:flex; align-items:center; gap:10px; }
@@ -143,12 +147,13 @@
   <div class="main">
     <div class="panel">
       
-      <div id="slot-draw" class="tabSlot on">
-        <h3>TOOLS</h3>
+      <div id="slot-draw" class="tabSlot on show-gpen"> <h3>TOOLS</h3>
         <div class="row">
           <div class="btn active" id="toolPen">G-Pen</div>
-          <div class="btn" id="toolEraser">Eraser</div>
-          <div class="btn" id="toolSelect">Select</div>
+          <div class="btn" id="toolShadow">Shadow</div> <div class="btn" id="toolEraser">Eraser</div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+           <div class="btn" id="toolSelect">Select</div>
         </div>
         <div class="row" style="margin-top:8px;">
             <div class="btn small" id="btnUndo">↶ Undo</div>
@@ -170,13 +175,23 @@
         <div class="sep"></div>
         <h3>PEN SETTINGS</h3>
         <label>Size <span id="vSize">4.0</span></label>
-        <input id="penSize" type="range" min="1" max="40" value="4">
-        <label>Taper <span id="vTaper">0.5</span></label>
-        <input id="penTaper" type="range" min="0" max="1" value="0.5" step="0.05">
-        <label>Pressure <span id="vPress">0.8</span></label>
-        <input id="penPress" type="range" min="0" max="1" value="0.8" step="0.05">
-        <label>Smooth <span id="vSmooth">0.4</span></label>
-        <input id="penSmooth" type="range" min="0" max="0.95" value="0.4" step="0.05">
+        <input id="penSize" type="range" min="1" max="100" value="4">
+        
+        <div class="grp-gpen">
+            <label>Taper <span id="vTaper">0.5</span></label>
+            <input id="penTaper" type="range" min="0" max="1" value="0.5" step="0.05">
+            <label>Pressure <span id="vPress">0.8</span></label>
+            <input id="penPress" type="range" min="0" max="1" value="0.8" step="0.05">
+            <label>Smooth <span id="vSmooth">0.4</span></label>
+            <input id="penSmooth" type="range" min="0" max="0.95" value="0.4" step="0.05">
+        </div>
+
+        <div class="grp-shadow">
+            <label title="Lower = more layers needed to darken">Flow (Opacity) <span id="vFlow">0.08</span></label>
+            <input id="shadowFlow" type="range" min="0.01" max="0.5" value="0.08" step="0.01">
+            <label title="Edge softness and spread">Wet (Bleed) <span id="vWet">0.75</span></label>
+            <input id="shadowWet" type="range" min="0.1" max="1.0" value="0.75" step="0.05">
+        </div>
 
         <div class="sep"></div>
         <h3>
@@ -286,13 +301,14 @@
   window.addEventListener('resize', resize);
 
   let layers=[], activeIdx=0;
-let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
-let selectionPointerId = null; // pointer capture id for select tool
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
+  let selectionPointerId = null; 
 
-let dragMode = 'move'; // 'move' (cut-move) or 'copy'
+  let dragMode = 'move'; 
   let lastPointer = {x:0,y:0};
   let __layerSeq=0;
-  // AnimX animation state (frames reference layer ids)
+  
+  // AnimX animation state
   let animFrames=[];
   let activeAnimIdx=0;
   let animPlaying=false;
@@ -338,25 +354,20 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
     gComp.clearRect(0,0,cComp.width,cComp.height);
     for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
 
-    // Selection overlay (Draw > Select tool)
     if(currentTab==='draw' && toolType==='select' && selection.active){
       const nx = Math.min(selection.x, selection.x + selection.w);
       const ny = Math.min(selection.y, selection.y + selection.h);
       const nw = Math.abs(selection.w), nh = Math.abs(selection.h);
       gComp.save();
       gComp.globalAlpha = 1.0;
-      // High-contrast selection outline (avoid white-on-bright)
       gComp.setLineDash([6,4]);
       gComp.lineWidth = 2;
-      // black under-stroke for contrast
       gComp.strokeStyle = 'rgba(0,0,0,0.85)';
       gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
-      // accent over-stroke
       gComp.lineWidth = 1;
       gComp.strokeStyle = 'rgba(0,208,255,0.95)';
       gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
       gComp.setLineDash([]);
-      // preview moved content while dragging
       if(selection.moving && selection.img){
         gComp.globalAlpha = 0.85;
         gComp.putImageData(selection.img, nx, ny);
@@ -371,8 +382,9 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
       }
     });
   }
+
   // ----------------------------
-  // AnimX: animation UI (frames are references to layer ids)
+  // AnimX: animation UI
   // ----------------------------
   const elAnimThumbs = document.getElementById('animThumbs');
   const elAnimSeq = document.getElementById('animSeq');
@@ -384,7 +396,6 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
   function getLayerById(id){ return layers.find(L=>L.id===id) || null; }
 
   function layerThumbURL(L){
-    // Downscale to keep UI light
     const tw=220, th=140;
     const t=makeCanvas(tw, th);
     const g=t.getContext('2d');
@@ -401,8 +412,6 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
 
   function updateAnimUI(){
     if(!elAnimThumbs || !elAnimSeq) return;
-
-    // Thumbnails from LAYERS (right panel)
     elAnimThumbs.innerHTML='';
     layers.forEach((L)=>{
       const item=document.createElement('div');
@@ -416,7 +425,6 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
       elAnimThumbs.appendChild(item);
     });
 
-    // Sequence
     elAnimSeq.innerHTML='';
     animFrames.forEach((layerId, idx)=>{
       const L=getLayerById(layerId);
@@ -434,10 +442,8 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
         </div>
       `;
       item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-
       item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
       item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-
       item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
       item.addEventListener('dragover', (e)=>{ e.preventDefault(); });
       item.addEventListener('drop', (e)=>{
@@ -451,7 +457,6 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
         updateAnimUI();
         renderAnimFrame(activeAnimIdx);
       });
-
       elAnimSeq.appendChild(item);
     });
 
@@ -507,16 +512,13 @@ let dragMode = 'move'; // 'move' (cut-move) or 'copy'
     }, frameMs);
   }
 
-  // Anim tab controls
   const btnAnimPlay = document.getElementById('btnAnimPlay');
   const btnAnimStop = document.getElementById('btnAnimStop');
 
   btnAnimPlay && (btnAnimPlay.onclick = ()=>{ startAnimPlayback(); });
   btnAnimStop && (btnAnimStop.onclick = ()=>{ stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
-
-elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
+  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
   elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
-
 
   function syncLayerOp(){
     if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); }
@@ -555,14 +557,82 @@ elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
 
   let drawing=false, pts=[]; let toolType = 'pen';
   const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
-  document.getElementById('toolPen').onclick=()=>{ toolType='pen'; document.getElementById('toolPen').classList.add('active'); document.getElementById('toolEraser').classList.remove('active'); const ts=document.getElementById('toolSelect'); if(ts) ts.classList.remove('active'); redrawComposite(); };
-  document.getElementById('toolEraser').onclick=()=>{ toolType='eraser'; document.getElementById('toolEraser').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); const ts=document.getElementById('toolSelect'); if(ts) ts.classList.remove('active'); redrawComposite(); };
-  
-  document.getElementById('toolSelect').onclick=()=>{ toolType='select'; document.getElementById('toolSelect').classList.add('active'); document.getElementById('toolPen').classList.remove('active'); document.getElementById('toolEraser').classList.remove('active'); redrawComposite(); };
-const bindSet = (id, key, dispId) => {
-    document.getElementById(id).oninput=(e)=>{ penSettings[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = penSettings[key]; };
+  // Shadow specific settings
+  const shadowSettings = { flow:0.08, wet:0.75, grain:0.35, spacing:0.33, edgeDark: 0.9 };
+
+  function setTool(t){
+    toolType=t;
+    document.getElementById('toolPen').classList.toggle('active', t==='pen');
+    document.getElementById('toolShadow').classList.toggle('active', t==='shadow');
+    document.getElementById('toolEraser').classList.toggle('active', t==='eraser');
+    document.getElementById('toolSelect').classList.toggle('active', t==='select');
+    
+    const panel = document.getElementById('slot-draw');
+    if(t === 'pen' || t === 'eraser') {
+        panel.classList.add('show-gpen'); panel.classList.remove('show-shadow');
+    } else if(t === 'shadow') {
+        panel.classList.remove('show-gpen'); panel.classList.add('show-shadow');
+    } else {
+        panel.classList.remove('show-gpen'); panel.classList.remove('show-shadow');
+    }
+    redrawComposite();
+  }
+
+  document.getElementById('toolPen').onclick=()=>setTool('pen');
+  document.getElementById('toolShadow').onclick=()=>setTool('shadow');
+  document.getElementById('toolEraser').onclick=()=>setTool('eraser');
+  document.getElementById('toolSelect').onclick=()=>setTool('select');
+
+  const bindSet = (id, key, dispId, obj=penSettings) => {
+    document.getElementById(id).oninput=(e)=>{ obj[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = obj[key]; };
   };
-  bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); bindSet('penSmooth','smooth','vSmooth'); bindSet('penTaper','taper','vTaper');
+  bindSet('penSize','size','vSize'); 
+  bindSet('penPress','press','vPress'); 
+  bindSet('penSmooth','smooth','vSmooth'); 
+  bindSet('penTaper','taper','vTaper');
+  
+  bindSet('shadowFlow', 'flow', 'vFlow', shadowSettings);
+  bindSet('shadowWet', 'wet', 'vWet', shadowSettings);
+
+  // --- Watercolor Stamp Logic ---
+  let wcStampCache = new Map();
+  function makeWatercolorStamp(size, wet=0.7, grain=0.35, edgeDark=0.85){
+    const s = Math.max(6, Math.floor(size));
+    // Cache key: size integer + wet rounded
+    const key = `${s}|${wet.toFixed(2)}|${grain.toFixed(2)}`;
+    if(wcStampCache.has(key)) return wcStampCache.get(key);
+
+    const c = document.createElement('canvas');
+    c.width = c.height = s*2;
+    const g = c.getContext('2d');
+    const cx = c.width/2, cy = c.height/2;
+    const r = s*(0.85 + wet*0.25);
+
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    // Deep black accumulation logic
+    grad.addColorStop(0.00, `rgba(0,0,0,0.03)`);
+    grad.addColorStop(0.55, `rgba(0,0,0,0.015)`);
+    grad.addColorStop(1.00, `rgba(0,0,0,${0.08 + 0.20*edgeDark})`);
+
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI*2);
+    g.fill();
+
+    if(grain > 0){
+        const img = g.getImageData(0,0,c.width,c.height);
+        const d = img.data;
+        for(let i=0;i<d.length;i+=4){
+            if(d[i+3]>0){ // optimize
+                const n = (Math.random()*2-1) * 60 * grain; 
+                d[i+3] = Math.max(0, Math.min(255, d[i+3] + n));
+            }
+        }
+        g.putImageData(img,0,0);
+    }
+    wcStampCache.set(key, c);
+    return c;
+  }
 
   function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
   function lerp(a,b,t){ return a+(b-a)*t; }
@@ -576,7 +646,6 @@ const bindSet = (id, key, dispId) => {
     return settings.size * pressFactor * Math.min(inT, outT);
   }
 
-  
   // ---- Selection (rect) tool ----
   function normRect(x,y,w,h){
     const nx = (w>=0)? x : x+w;
@@ -587,15 +656,15 @@ const bindSet = (id, key, dispId) => {
 
   function beginSelect(e){
     const p = evPos(e, cInput);
-
     if(!layers[activeIdx]) return;
+    selection.dragging = true;  
+    cInput.setPointerCapture?.(e.pointerId); 
     const r = normRect(selection.x, selection.y, selection.w, selection.h);
     const inside = selection.active && selection.img && pointInRect(p.x, p.y, r);
     selection.startX = p.x; selection.startY = p.y;
     if(inside){
       selection.moving = true;
       selection.baseX = selection.x; selection.baseY = selection.y;
-      // remember origin rect for cut-move semantics
       selection.origin = { x:r.x, y:r.y, w:r.w, h:r.h };
     }else{
       selection.active = true;
@@ -609,8 +678,8 @@ const bindSet = (id, key, dispId) => {
 
   function moveSelect(e){
     const p = evPos(e, cInput);
-
     if(!selection.active) return;
+    if(!selection.dragging) return; 
     if(selection.moving){
       const dx = p.x - selection.startX;
       const dy = p.y - selection.startY;
@@ -627,11 +696,9 @@ const bindSet = (id, key, dispId) => {
     if(!layers[activeIdx]) return;
     const ctx = layers[activeIdx].ctx;
     if(!selection.active) return;
-
-    // finalize rect
+    selection.dragging = false;   
     const r = normRect(selection.x, selection.y, selection.w, selection.h);
 
-    // If we were creating a new selection:
     if(!selection.moving){
       if(r.w < 2 || r.h < 2){
         selection.active = false; selection.img = null;
@@ -641,31 +708,21 @@ const bindSet = (id, key, dispId) => {
       try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
       redrawComposite(); return;
     }
-
-    // If we were moving: commit move as CUT+PASTE on active layer
     selection.moving = false;
     if(!selection.img){
-      // (re-capture if missing)
       try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
     }
     if(!selection.img){ redrawComposite(); return; }
-
     const before = snapshotLayer(activeIdx);
-
-    // clear original only if dragMode==='move'
     const prev = selection.origin || normRect(selection.baseX, selection.baseY, selection.w, selection.h);
     if(dragMode === 'move'){
       ctx.clearRect(prev.x, prev.y, prev.w, prev.h);
     }
-
-    // paste at new position (clamped)
     const nx = Math.max(0, Math.min(cComp.width - selection.img.width, Math.floor(selection.x)));
     const ny = Math.max(0, Math.min(cComp.height - selection.img.height, Math.floor(selection.y)));
     ctx.putImageData(selection.img, nx, ny);
-
     const after = snapshotLayer(activeIdx);
     recordHistory(before, after, activeIdx);
-
     selection.x = nx; selection.y = ny; selection.w = selection.img.width; selection.h = selection.img.height;
     selection.origin = { x:nx, y:ny, w:selection.img.width, h:selection.img.height };
     redrawComposite();
@@ -707,51 +764,103 @@ const bindSet = (id, key, dispId) => {
     lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ moveSelect(e); return; }
     if(!drawing) return; const raw={x:p.x, y:p.y, p:e.pressure||0.5};
-    const k = 1.0 - penSettings.smooth; const last = pts[pts.length-1];
+    
+    // For watercolor, we want less smoothing to control position better, but some is good.
+    // For G-Pen, we use the settings.
+    const k = (toolType === 'shadow') ? 0.3 : (1.0 - penSettings.smooth);
+    const last = pts[pts.length-1];
     pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
     drawPreview(gInput, pts);
   });
 
-const endStroke = ()=>{
+  const endStroke = ()=>{
     if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
-    ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over';
-    drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    
+    if(toolType === 'shadow'){
+        // Shadow (multiply)
+        ctx.globalCompositeOperation = 'multiply';
+        drawStroke(ctx, pts);
+        ctx.globalCompositeOperation = 'source-over';
+    } else {
+        // G-Pen / Eraser
+        ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over';
+        drawStroke(ctx, pts); 
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
     gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
     if(strokeStartData){ recordHistory(strokeStartData, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx); strokeStartData = null; }
   };
 
-  cInput.addEventListener('pointerup', e=>{
-    if(currentTab!=='draw') return;
-    const p = evPos(e, cInput);
-    lastPointer = {x:p.x, y:p.y};
-    if(toolType==='select'){ endSelect(e); if(selectionPointerId!==null){ try{ cInput.releasePointerCapture(selectionPointerId);}catch(_){ } selectionPointerId=null; } return; }
-    endStroke();
-  });
-
-  // Ensure selection finalizes even if pointerup/cancel happens off-canvas
-  cInput.addEventListener('pointercancel', e=>{
-    if(currentTab!=='draw') return;
-    if(toolType==='select'){
-      endSelect(e);
-      if(selectionPointerId!==null){ try{ cInput.releasePointerCapture(selectionPointerId);}catch(_){ } selectionPointerId=null; }
-    } else {
-      endStroke();
+  cInput.addEventListener('pointerup', (e) => {
+    if (toolType === 'select') {
+      if (typeof endSelect === 'function') { endSelect(e); } 
+      try { cInput.releasePointerCapture(e.pointerId); } catch (_) {}
+      return;
     }
-  });
-  cInput.addEventListener('lostpointercapture', e=>{
-    if(currentTab!=='draw') return;
-    if(toolType==='select' && selection.active){
-      // finalize selection/move on capture loss
-      endSelect(e);
-      selectionPointerId=null;
-    }
+    if(typeof endStroke === 'function') endStroke();
   });
 
-
+  // --- Core Drawing Logic ---
   function drawStroke(ctx, points){
-    if(points.length<2) return; const {lens, total} = getStrokeLengths(points);
+    if(points.length<2) return; 
+
+    // === WATERCOLOR SHADOW BRANCH ===
+    if(toolType === 'shadow'){
+        const stampSize = penSettings.size * 2; // base size
+        const stamp = makeWatercolorStamp(stampSize, shadowSettings.wet, shadowSettings.grain, shadowSettings.edgeDark);
+        const spacing = shadowSettings.spacing; // e.g. 0.33
+        const flow = shadowSettings.flow;
+        
+        ctx.save();
+        ctx.globalAlpha = flow; // Accumulate opacity
+
+        for(let i=1; i<points.length; i++){
+            const p0 = points[i-1], p1 = points[i];
+            const dx=p1.x-p0.x, dy=p1.y-p0.y;
+            const distVal = Math.hypot(dx,dy);
+            if(distVal < 0.5) continue; // too close
+
+            const stepPx = Math.max(1, stamp.width * spacing);
+            const n = Math.ceil(distVal / stepPx);
+            
+            for(let j=0; j<n; j++){
+                const t = j/n;
+                const x = p0.x + dx*t;
+                const y = p0.y + dy*t;
+                // Jitter
+                const jx = (Math.random()*2-1)*0.5;
+                const jy = (Math.random()*2-1)*0.5;
+                // Pressure size modulation
+                const press = lerp(p0.p, p1.p, t);
+                const currentScale = 0.5 + 0.5*press; // scale 0.5 ~ 1.0 based on pressure
+
+                const dw = stamp.width * currentScale;
+                const dh = stamp.height * currentScale;
+
+                ctx.drawImage(stamp, x - dw/2 + jx, y - dh/2 + jy, dw, dh);
+            }
+        }
+        ctx.restore();
+        return;
+    }
+
+    // === STANDARD GPEN BRANCH ===
+    const {lens, total} = getStrokeLengths(points);
     const strength = (toolType === 'eraser') ? 2.4 : 1.0;
     ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
+    
+    // Simplistic rendering for Eraser (perf) vs Nice Taper for Pen
+    if(toolType === 'eraser'){
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.lineWidth = penSettings.size;
+        ctx.stroke();
+        return;
+    }
+
+    // Tapered G-Pen
     for(let i=1; i<points.length; i++){
       const t0 = lens[i-1]/total, t1 = lens[i]/total;
       const w0 = getWidthAt(t0, points[i-1].p, penSettings), w1 = getWidthAt(t1, points[i].p, penSettings);
@@ -760,13 +869,22 @@ const endStroke = ()=>{
       ctx.beginPath(); ctx.arc(points[i].x, points[i].y, w1/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
     }
   }
+
   function drawPreview(ctx, points){
     ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); if(points.length<2) return;
     if(toolType==='eraser'){
       ctx.strokeStyle = '#ffcccc'; ctx.globalAlpha=0.5; ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y); for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.lineWidth = penSettings.size; ctx.stroke();
-    } else drawStroke(ctx, points);
+    } else if(toolType === 'shadow'){
+      // Simplified preview for shadow
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = penSettings.size; 
+      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+      for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    } else {
+      drawStroke(ctx, points);
+    }
   }
 
   document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
@@ -788,16 +906,11 @@ const endStroke = ()=>{
     const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
   };
   // ---- Clipboard (layer bitmap) ----
-  let __clipboard = null; // {w,h,data:ImageData}
+  let __clipboard = null; 
   function snapshotLayer(idx){
     if(!layers[idx]) return null;
     const ctx = layers[idx].ctx;
     return ctx.getImageData(0,0,cComp.width,cComp.height);
-  }
-  function setLayerFromImageData(idx, img){
-    if(!layers[idx]) return;
-    layers[idx].ctx.putImageData(img, 0, 0);
-    redrawComposite();
   }
   function doCopy(){
     if(!layers[activeIdx]) return;
@@ -837,18 +950,15 @@ const endStroke = ()=>{
     const before = snapshotLayer(activeIdx);
 
     if(__clipboard.kind === 'rect'){
-      // Paste at selection top-left if selection exists, else at last pointer.
       const px = (selection.active) ? Math.floor(selection.x) : Math.floor(lastPointer.x || 0);
       const py = (selection.active) ? Math.floor(selection.y) : Math.floor(lastPointer.y || 0);
       const nx = Math.max(0, Math.min(ctx.canvas.width - __clipboard.w, px));
       const ny = Math.max(0, Math.min(ctx.canvas.height - __clipboard.h, py));
       ctx.putImageData(__clipboard.data, nx, ny);
 
-      // update selection to pasted region
       selection.active = true;
       selection.moving = false;
       selection.x = nx; selection.y = ny; selection.w = __clipboard.w; selection.h = __clipboard.h;
-      // recapture from layer (ensures consistency)
       try{ selection.img = ctx.getImageData(nx, ny, __clipboard.w, __clipboard.h); }catch(_){ selection.img=null; }
     }else{
       ctx.putImageData(__clipboard.data, 0, 0);
@@ -890,7 +1000,6 @@ const endStroke = ()=>{
   if(elDragCopy) elDragCopy.onclick = ()=>{ dragMode='copy'; syncDragModeUI(); };
   syncDragModeUI();
 
-  // Keyboard shortcuts: Ctrl/Cmd + C/X/V
   window.addEventListener('keydown', e => {
     const mod = e.ctrlKey || e.metaKey;
     if(!mod) return;
@@ -918,7 +1027,6 @@ const endStroke = ()=>{
     const fps = Number(document.getElementById('animFps')?.value ?? 12);
     const loop = Number(document.getElementById('animLoop')?.value ?? 0);
 
-    // Layers: store as PNG for deterministic roundtrip
     const layerPayload = layers.map(l => ({
       id: l.id,
       name: l.name,
@@ -968,27 +1076,22 @@ const endStroke = ()=>{
   async function applyAnimxProject(proj){
     if(!isValidAnimxProject(proj)) throw new Error('invalid_animx');
 
-    // Set logical canvas resolution to project size
     cComp.width = cInput.width = Math.max(1, Math.floor(proj.canvas.w));
     cComp.height = cInput.height = Math.max(1, Math.floor(proj.canvas.h));
     gComp.clearRect(0,0,cComp.width,cComp.height);
     gInput.clearRect(0,0,cInput.width,cInput.height);
 
-    // Rebuild layers
     layers = [];
     __layerSeq = 0;
     for(const L of proj.layers){
       const c = makeCanvas(cComp.width, cComp.height);
       const ctx = c.getContext('2d');
-      // best-effort restore image (no smoothing for pixel art; fine for rough)
       try{
         const img = await loadImage(L.png);
         ctx.imageSmoothingEnabled = true;
         ctx.clearRect(0,0,c.width,c.height);
         ctx.drawImage(img, 0,0, c.width, c.height);
-      }catch(_){
-        // keep empty layer if image load fails
-      }
+      }catch(_){ }
       layers.push({
         id: String(L.id || `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`),
         name: String(L.name || 'Layer'),
@@ -999,12 +1102,10 @@ const endStroke = ()=>{
       });
     }
 
-    // Restore UI state
     const wanted = proj.ui?.active_layer_id || null;
     activeIdx = Math.max(0, layers.findIndex(x=>x.id===wanted));
     if(activeIdx < 0) activeIdx = 0;
 
-    // Trace / reference
     if(proj.trace){
       uiToggle.checked = !!proj.trace.enabled;
       uiYaw.value = String(Number(proj.trace.yaw ?? 0));
@@ -1014,7 +1115,6 @@ const endStroke = ()=>{
     }
     updateMatrixView();
 
-    // Anim
     animFrames = Array.isArray(proj.anim?.frames) ? proj.anim.frames.map(String) : [];
     activeAnimIdx = Math.max(0, Math.min(Number(proj.ui?.active_frame_index ?? 0), Math.max(0, animFrames.length-1)));
     if(proj.anim){
@@ -1053,7 +1153,6 @@ const endStroke = ()=>{
   function u16le(v){ return [v&255,(v>>8)&255]; }
   function u24le(v){ return [v&255,(v>>8)&255,(v>>16)&255]; }
   function str4(s){ return [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)]; }
-
   function readU32LE(d, o){ return (d[o]) | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24); }
 
   function parseWebPImageChunks(arrayBuffer){
@@ -1072,7 +1171,7 @@ const endStroke = ()=>{
       if(tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH'){
         chunks.push({tag, data: d.slice(dataStart, dataEnd)});
       }
-      off = dataEnd + (size % 2); // pad to even
+      off = dataEnd + (size % 2); 
     }
     if(chunks.length === 0) throw new Error('No VP8/VP8L chunk found');
     return chunks;
@@ -1085,12 +1184,10 @@ const endStroke = ()=>{
     out.set(str4(tag), 0);
     out.set(u32le(size), 4);
     out.set(dataBytes, 8);
-    // pad byte already zero
     return out;
   }
 
   function buildAnimatedWebP({width, height, loopCount, frames}){
-    // Determine alpha flag
     let hasAlpha = false;
     for(const f of frames){
       for(const c of f.chunks){
@@ -1099,7 +1196,6 @@ const endStroke = ()=>{
       if(hasAlpha) break;
     }
 
-    // VP8X flags: bit1 animation, bit4 alpha
     const flags = (1<<1) | (hasAlpha ? (1<<4) : 0);
     const vp8xPayload = new Uint8Array([
       flags, 0,0,0,
@@ -1109,7 +1205,6 @@ const endStroke = ()=>{
     const chunksOut = [];
     chunksOut.push(makeChunk('VP8X', vp8xPayload));
 
-    // ANIM chunk: bgcolor (ARGB little-endian) + loop count (0=inf)
     const animPayload = new Uint8Array([
       0,0,0,0,
       ...u16le(loopCount),
@@ -1123,9 +1218,8 @@ const endStroke = ()=>{
         ...u24le(x), ...u24le(y),
         ...u24le(w-1), ...u24le(h-1),
         ...u24le(duration),
-        0x00 // flags: blend=0 (blend), dispose=0 (none)
+        0x00 
       ]);
-      // Compose frame chunk payload: 16-byte header + image subchunks
       let payloadParts = [frameHdr];
       for(const c of f.chunks){
         payloadParts.push(makeChunk(c.tag, c.data));
@@ -1182,7 +1276,6 @@ const endStroke = ()=>{
   const btnExportAnimWebP = document.getElementById('btnExportAnimWebP');
   btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
 
-// --- MATRIX TRACE LOGIC (1500x1500, 5x5 Grid) ---
   const refImage = document.getElementById('refImage');
   const uiToggle = document.getElementById('traceToggle') || document.getElementById('refToggle');
   const uiYaw = document.getElementById('traceYaw');
@@ -1190,19 +1283,13 @@ const endStroke = ()=>{
   const uiZoom = document.getElementById('refZoom');
   const uiOp = document.getElementById('refOp');
 
-  // 【設定】1500px ÷ 5 = 300px
   const CELL_W = 300; 
   const CELL_H = 300; 
-  
-  // セルの中心
   const START_CX = 150; 
   const START_CY = 150; 
-  
-  // 表示枠の中心
   const CONTAINER_CW = 150; 
   const CONTAINER_CH = 150;
 
-  // 表示用ラベル定義 (Yaw: ±90, Pitch: ±30)
   const LABEL_YAW = { "-2":"-90", "-1":"-45", "0":"0", "1":"45", "2":"90" };
   const LABEL_PITCH = { "2":"30", "1":"15", "0":"0", "-1":"-15", "-2":"-30" };
 
@@ -1213,13 +1300,11 @@ const endStroke = ()=>{
     }
     if(refContainer) refContainer.style.display = 'block';
 
-    // 値を取得 (-2 〜 2)
     const yawVal = parseInt(uiYaw.value); 
     const pitchVal = parseInt(uiPitch.value); 
     const zoomVal = parseFloat(uiZoom.value); 
     const opVal = parseFloat(uiOp.value);
 
-    // ラベル更新
     const elYaw = document.getElementById('vYaw');
     const elPitch = document.getElementById('vPitch');
     const elZoom = document.getElementById('vRefZoom');
@@ -1230,7 +1315,6 @@ const endStroke = ()=>{
     if(elZoom) elZoom.innerText = zoomVal.toFixed(2);
     if(elOp) elOp.innerText = opVal.toFixed(2);
 
-    // 枠の適用
     if(refContainer){
         refContainer.style.opacity = opVal; 
         refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
@@ -1238,17 +1322,10 @@ const endStroke = ()=>{
         refContainer.style.height = `${CELL_H}px`;
     }
 
-    // --- 座標計算 ---
-    // Yaw (-2..2) -> Col (0..4)
     const col = yawVal + 2; 
-    
-    // Pitch (-2..2) -> Row (0..4)  ※+2が上段(Row0)の場合
     const row = 2 - pitchVal; 
-
-    // 移動量計算
     const cx = START_CX + col * CELL_W; 
     const cy = START_CY + row * CELL_H;
-
     const targetX = CONTAINER_CW - cx; 
     const targetY = CONTAINER_CH - cy;
 
@@ -1257,7 +1334,6 @@ const endStroke = ()=>{
     }
   }
 
-  // イベント登録
   const controls = [uiToggle, uiYaw, uiPitch, uiZoom, uiOp];
   controls.forEach(el => {
     if(el) {
@@ -1266,9 +1342,10 @@ const endStroke = ()=>{
     }
   });
 
-  // 初期化
+  resize(); 
+  addLayer("Line Art"); 
   updateMatrixView(); setTab('draw'); 
-})();
+  })();
 </script>
 </body>
 </html>
