@@ -319,7 +319,7 @@
   function addLayer(name){
     const c=makeCanvas(cComp.width, cComp.height);
     const id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
-    layers.unshift({id, name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d')});
+    layers.unshift({id, name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d', { willReadFrequently: true })});
     activeIdx=0; updateLayerUI();
   }
   function moveLayer(idx, dir){
@@ -378,7 +378,11 @@
   function ensureLayerSize(){
     layers.forEach(L=>{
       if(L.canvas.width!==cComp.width || L.canvas.height!==cComp.height){
-        const c=makeCanvas(cComp.width, cComp.height); c.getContext('2d').drawImage(L.canvas,0,0); L.canvas=c; L.ctx=c.getContext('2d');
+        const c=makeCanvas(cComp.width, cComp.height); 
+const cx=c.getContext('2d', { willReadFrequently: true });
+cx.drawImage(L.canvas,0,0); 
+L.canvas=c; 
+L.ctx=cx;
       }
     });
   }
@@ -890,7 +894,10 @@
   document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
   document.getElementById('btnDelLayer').onclick=()=>{if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}};
   document.getElementById('btnDupLayer').onclick=()=>{
-    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); c.getContext('2d').drawImage(src.canvas,0,0);
+    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); 
+const cx=c.getContext('2d', { willReadFrequently: true });
+cx.drawImage(src.canvas,0,0);
+layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, opacity:src.opacity, canvas:c, ctx:cx});
     layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, opacity:src.opacity, canvas:c, ctx:c.getContext('2d')});
     updateLayerUI();
   };
