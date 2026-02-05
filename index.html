@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AnimX - Mouse Zoom</title>
+  <title>AnimX</title>
   <style>
     :root{
       --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
@@ -74,22 +74,22 @@
       overflow: hidden; 
     }
     
+    /* FIX: Use CSS Grid + Auto Margins for perfect center/scroll behavior */
     .stageContainer {
       flex: 1; 
-      overflow: auto; /* Scrollbars appear HERE */
+      overflow: auto; 
       background: #101216; 
       border-radius: 4px;
-      position: relative;
-      /* Center content */
-      display: flex; 
-      align-items: center; 
-      justify-content: center;
+      display: grid; /* Grid is robust for this */
+      /* No place-items: center here, let margin:auto do it to preserve scroll */
     }
 
     /* Invisible wrapper to force scrollbars when zoomed */
     #canvasScaleTarget {
-      flex: 0 0 auto;
-      display: flex; align-items: center; justify-content: center;
+      margin: auto; /* KEY: Centers content if smaller than view, stays put if larger */
+      display: block;
+      position: relative;
+      /* Size will be set by JS */
     }
     
     /* Stage (The actual canvas) */
@@ -366,7 +366,6 @@
     const nextScale = +e.target.value / 100;
     vZoom.innerText = +e.target.value + '%';
     
-    // Zoom towards center of viewport
     const rect = stageContainer.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
@@ -374,20 +373,41 @@
     zoomToPoint(nextScale, cx, cy);
   };
 
-  // Helper to handle scrolling adjustments for zoom
-  function zoomToPoint(nextScale, ox, oy){
-    // 1. Calculate point under offset (ox, oy) in unscaled canvas coordinates
-    //    currentPixel = (offset + scroll) / oldScale
-    const pX = (ox + stageContainer.scrollLeft) / currentScale;
-    const pY = (oy + stageContainer.scrollTop) / currentScale;
+  function zoomToPoint(nextScale, mouseClientX, mouseClientY){
+    // ROBUST ZOOM: Use getBoundingClientRect to calculate shift based on VISUAL position.
+    // This handles both "Centered by Margin" and "Scrolled" states perfectly.
+    
+    const tRect = elScaleTarget.getBoundingClientRect();
+    const cRect = stageContainer.getBoundingClientRect();
 
-    // 2. Apply new scale
+    // 1. Where is the mouse relative to the Top-Left of the image (regardless of scroll/margin)?
+    const relX = mouseClientX - tRect.left;
+    const relY = mouseClientY - tRect.top;
+
+    // 2. Convert to unscaled 'canvas pixels'
+    const canvasX = relX / currentScale;
+    const canvasY = relY / currentScale;
+
+    // 3. Apply new scale
     applyZoom(nextScale);
 
-    // 3. Scroll so that pX, pY is back at ox, oy
-    //    newScroll = (pX * newScale) - offset
-    stageContainer.scrollLeft = (pX * nextScale) - ox;
-    stageContainer.scrollTop = (pY * nextScale) - oy;
+    // 4. Calculate where that point ends up relative to container, and adjust scroll
+    // New pixel position relative to Top-Left of scaled element
+    const newRelX = canvasX * nextScale;
+    const newRelY = canvasY * nextScale;
+
+    // We want (newRelX) to be at (mouseClientX) relative to screen
+    // The container's top-left on screen is cRect.left, cRect.top
+    // Scroll position effectively shifts the content UP/LEFT.
+    
+    // Target Scroll = (Position inside Image) - (Mouse Position relative to Container)
+    const mouseOffsetX = mouseClientX - cRect.left;
+    const mouseOffsetY = mouseClientY - cRect.top;
+
+    // Only scroll if content is larger than viewport, otherwise CSS margin:auto handles it.
+    // Note: scrollLeft/Top clamps to 0 automatically if negative.
+    stageContainer.scrollLeft = newRelX - mouseOffsetX;
+    stageContainer.scrollTop = newRelY - mouseOffsetY;
   }
 
   // Wheel zoom -> Zoom to Mouse
@@ -395,21 +415,16 @@
     if (e.ctrlKey) {
       e.preventDefault();
       
-      const rect = stageContainer.getBoundingClientRect();
-      const ox = e.clientX - rect.left;
-      const oy = e.clientY - rect.top;
-
       const delta = e.deltaY > 0 ? -10 : 10;
       let nextVal = Math.round(currentScale * 100) + delta;
       nextVal = Math.max(10, Math.min(400, nextVal)); // Clamp 10-400%
       
       const nextScale = nextVal / 100;
 
-      // Sync UI
       elZoom.value = nextVal;
       vZoom.innerText = nextVal + '%';
 
-      zoomToPoint(nextScale, ox, oy);
+      zoomToPoint(nextScale, e.clientX, e.clientY);
     }
   }, { passive: false });
 
