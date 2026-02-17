@@ -618,11 +618,12 @@
     }, frameMs);
   }
 
-  const btnAnimPlay = document.getElementById('btnAnimPlay');
+const btnAnimPlay = document.getElementById('btnAnimPlay');
   const btnAnimStop = document.getElementById('btnAnimStop');
 
-  btnAnimPlay && (btnAnimPlay.onclick = ()=>{ startAnimPlayback(); });
-  btnAnimStop && (btnAnimStop.onclick = ()=>{ stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
+
+  btnAnimPlay && (btnAnimPlay.onpointerdown = (e)=>{ e.preventDefault(); startAnimPlayback(); });
+  btnAnimStop && (btnAnimStop.onpointerdown = (e)=>{ e.preventDefault(); stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
   elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
   elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
 
