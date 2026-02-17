@@ -256,7 +256,7 @@
         <div class="btn accent" id="btnExportPNG">Export PNG</div>
         <input id="fileImportAnimx" type="file" accept="*" style="display:none" />
         <div class="btn accent" id="btnExportAnimWebP">Export Animated WebP</div>
-        <div class="btn accent" id="btnExportAnimAPNG" style="margin-top:4px;">Export APNG (for iPad)</div> 
+        <div class="btn accent" id="btnExportAnimMP4">Export MP4(iPad)</div> 
         <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
       </div>
 
@@ -1313,152 +1313,125 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
   const controls = [uiToggle, uiYaw, uiPitch, uiOp];
   controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
 
-
-// ---- APNG Export Logic (Fixed: Red Noise & Memory Opt) ----
-  const crcTable = new Uint32Array(256);
-  for(let n=0; n<256; n++){ let c=n; for(let k=0; k<8; k++) c=(c&1)?0xedb88320^(c>>>1):c>>>1; crcTable[n]=c; }
-  function crc32(u8arr){ let c=0xffffffff; for(let i=0; i<u8arr.length; i++) c=crcTable[(c^u8arr[i])&0xff]^(c>>>8); return (c^0xffffffff)>>>0; }
-
-  function writeChunk(type, data, outArr){
-    const len = data.length;
-    const totalLen = 12 + len;
-    const chunk = new Uint8Array(totalLen);
-    let offset = 0;
-    chunk[offset++] = (len >>> 24) & 0xff;
-    chunk[offset++] = (len >>> 16) & 0xff;
-    chunk[offset++] = (len >>> 8) & 0xff;
-    chunk[offset++] = len & 0xff;
-    const typeArr = [type.charCodeAt(0), type.charCodeAt(1), type.charCodeAt(2), type.charCodeAt(3)];
-    chunk[offset++] = typeArr[0]; chunk[offset++] = typeArr[1]; chunk[offset++] = typeArr[2]; chunk[offset++] = typeArr[3];
-    if(len > 0) chunk.set(data, offset);
-    offset += len;
-    const crcSource = new Uint8Array(4 + len);
-    crcSource.set(typeArr, 0);
-    if(len > 0) crcSource.set(data, 4);
-    const crc = crc32(crcSource);
-    chunk[offset++] = (crc >>> 24) & 0xff;
-    chunk[offset++] = (crc >>> 16) & 0xff;
-    chunk[offset++] = (crc >>> 8) & 0xff;
-    chunk[offset++] = crc & 0xff;
-    outArr.push(chunk);
+// 1. iPad/Safariで動く動画形式を自動で選ぶ
+  function pickMime(){
+    const candidates = [
+      'video/mp4;codecs=avc1.42E01E', // iPad/iPhoneの標準
+      'video/mp4;codecs=avc1',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm'
+    ];
+    for (const m of candidates){
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return '';
   }
 
-  async function exportAnimationAPNG(){
-    if(animFrames.length === 0){ alert('No frames in SEQUENCE.'); return; }
-    const btn = document.getElementById('btnExportAnimAPNG');
+  // 2. iPadでのファイル保存失敗（破損）を防ぐ
+  function downloadBlob(filename, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    // iPadはシステムがファイルを拾うまで時間がかかるため、30秒待ってから消去
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 30000);
+  }
+
+  // 3. メインの書き出しロジック
+  async function exportAnimationMP4() {
+    if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
+    
+    const btn = document.getElementById('btnExportAnimMP4');
     const originalText = btn.innerText;
     btn.innerText = "Encoding...";
 
-    const w = cComp.width, h = cComp.height;
-    const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
-    const tctx = tmp.getContext('2d');
-    
     const fpsVal = Number(document.getElementById('animFps').value) || 12;
-    const durationMs = Math.round(1000 / fpsVal);
+    const durationMs = 1000 / fpsVal;
     
+    // キャンバスから映像ストリームを取得 (0fps=手動フレーム送り)
+    const stream = cComp.captureStream(fpsVal); 
+    const track = stream.getVideoTracks()[0];
+    const mimeType = pickMime();
+
+    let recorder;
     try {
-      const parts = [];
-      let seq = 0;
-      
-      // 1. Signature
-      parts.push(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
-
-      // 2. Generate Frames (Force TrueColor using Red Noise)
-      const framesData = [];
-      for(let i=0; i<animFrames.length; i++){
-        const li = layers.findIndex(l=>l.id===animFrames[i]); if(li<0) continue;
-        tctx.clearRect(0,0,w,h);
-        tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,w,h);
-        tctx.drawImage(layers[li].canvas, 0,0);
-        
-        // 【修正】白背景に「薄い赤」を置くことで、計算結果を (255, 252, 252) にする。
-        // これでiPadは「これは白黒画像ではない」と判断し、TrueColorモードで保存する。
-        tctx.fillStyle = 'rgba(255, 0, 0, 0.01)';
-        tctx.fillRect(0, 0, 1, 1);
-        
-        const blob = await new Promise(r=>tmp.toBlob(r, 'image/png'));
-        const buf = await blob.arrayBuffer();
-        framesData.push(new Uint8Array(buf));
-      }
-
-      if(framesData.length === 0) throw new Error("No frame data generated");
-
-      // 3. Header Scan
-      const f0 = framesData[0];
-      let pos = 8;
-      while(pos < f0.length){
-        const len = (f0[pos]<<24)|(f0[pos+1]<<16)|(f0[pos+2]<<8)|f0[pos+3];
-        const type = String.fromCharCode(f0[pos+4], f0[pos+5], f0[pos+6], f0[pos+7]);
-        if(type === 'IHDR'){
-           const chunk = f0.slice(pos, pos + 12 + len);
-           parts.push(chunk);
-           
-           const actlData = new Uint8Array(8);
-           const view = new DataView(actlData.buffer);
-           view.setUint32(0, framesData.length);
-           const loop = Number(document.getElementById('animLoop').value)||0;
-           view.setUint32(4, loop);
-           writeChunk("acTL", actlData, parts);
-           break;
-        }
-        pos += 12 + len;
-      }
-
-      // 4. Frames Process
-      for(let i=0; i<framesData.length; i++){
-        const frame = framesData[i];
-        
-        const fctl = new Uint8Array(26);
-        const fview = new DataView(fctl.buffer);
-        fview.setUint32(0, seq++);   
-        fview.setUint32(4, w);       
-        fview.setUint32(8, h);       
-        fview.setUint32(12, 0);      
-        fview.setUint32(16, 0);      
-        fview.setUint16(20, durationMs); 
-        fview.setUint16(22, 1000);       
-        fview.setUint8(24, 0);       
-        fview.setUint8(25, 0);       
-        writeChunk("fcTL", fctl, parts);
-
-        let p = 8;
-        while(p < frame.length){
-          const len = (frame[p]<<24)|(frame[p+1]<<16)|(frame[p+2]<<8)|frame[p+3];
-          const type = String.fromCharCode(frame[p+4], frame[p+5], frame[p+6], frame[p+7]);
-          
-          if(type === 'IDAT'){
-            const data = frame.slice(p+8, p+8+len);
-            if(i === 0){
-              writeChunk("IDAT", data, parts);
-            } else {
-              const fdat = new Uint8Array(4 + data.length);
-              const fview2 = new DataView(fdat.buffer);
-              fview2.setUint32(0, seq++);
-              fdat.set(data, 4);
-              writeChunk("fdAT", fdat, parts);
-            }
-          }
-          p += 12 + len;
-        }
-      }
-
-      // 5. IEND
-      writeChunk("IEND", new Uint8Array(0), parts);
-
-      // 6. Flatten (Optimized for iPad Memory)
-      // 配列を手動結合せず、Blobコンストラクタに任せる（メモリ効率向上）
-      const blob = new Blob(parts, {type:'image/png'});
-      const ts = new Date().toISOString().replace(/[:.]/g,'-');
-      downloadBlob(`AnimX_${ts}.png`, blob);
-
-    } catch(e){
-      alert("APNG Error: "+e.message);
-      console.error(e);
-    } finally {
+      // 200msごとにデータを吐き出し(start(200))、メモリ爆発を防止
+      recorder = new MediaRecorder(stream, mimeType ? { 
+        mimeType,
+        videoBitsPerSecond: 2500000 
+      } : {});
+    } catch(e) {
+      alert("Recorder Error: " + e.message);
       btn.innerText = originalText;
+      return;
     }
+
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    
+    recorder.onstop = () => {
+      if (chunks.length === 0) {
+        alert("Export failed: No data recorded. (0 bytes)");
+        btn.innerText = originalText;
+        return;
+      }
+      const actualType = recorder.mimeType || 'video/mp4';
+      const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: actualType });
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const def = 'AnimX';
+      let base = prompt('ファイル名（拡張子なし）', def);
+      if(base === null) { btn.innerText = originalText; return; } // キャンセル
+      base = base.trim() || def;
+      base = base.replace(/[\\\/:*?"<>|]+/g, '_').slice(0,64);
+      downloadBlob(`${base}.${ext}`, blob);
+      btn.innerText = originalText;
+      redrawComposite(); 
+    };
+
+    recorder.start(200); // 【重要】小刻みにデータを確定させてiPadのメモリを守る
+    stopAnimPlayback(); 
+
+    let i = 0;
+    const recordOneFS = async () => {
+      if (i >= animFrames.length) {
+        // 最後のコマを少し長めに残して終了処理
+        setTimeout(() => recorder.stop(), 200);
+        return;
+      }
+
+      const L = getLayerById(animFrames[i]);
+      if (L) {
+        // 描画処理：背景を最初に塗りつぶす（焼き付き防止）
+        gComp.setTransform(1,0,0,1,0,0);
+        gComp.clearRect(0, 0, cComp.width, cComp.height);
+        gComp.fillStyle = '#ffffff';
+        gComp.fillRect(0, 0, cComp.width, cComp.height);
+        gComp.globalAlpha = 1.0;
+        gComp.drawImage(L.canvas, 0, 0);
+        
+      requestAnimationFrame(() => {});
+        if (track && track.requestFrame) {
+          track.requestFrame();
+        }
+      }
+
+      i++;
+      // setTimeoutで1コマずつ確実にエンコード時間を確保
+      setTimeout(recordOneFS, durationMs);
+    };
+
+    recordOneFS();
   }
-  document.getElementById('btnExportAnimAPNG').onclick = exportAnimationAPNG;
+
+  document.getElementById('btnExportAnimMP4').onclick = exportAnimationMP4;
 
   addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
   })();
