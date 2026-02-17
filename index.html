@@ -1313,7 +1313,8 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
   const controls = [uiToggle, uiYaw, uiPitch, uiOp];
   controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
 
-// ---- APNG Export Logic (Final Fix: Force TrueColor & Consistency) ----
+
+// ---- APNG Export Logic (Fixed: Red Noise & Memory Opt) ----
   const crcTable = new Uint32Array(256);
   for(let n=0; n<256; n++){ let c=n; for(let k=0; k<8; k++) c=(c&1)?0xedb88320^(c>>>1):c>>>1; crcTable[n]=c; }
   function crc32(u8arr){ let c=0xffffffff; for(let i=0; i<u8arr.length; i++) c=crcTable[(c^u8arr[i])&0xff]^(c>>>8); return (c^0xffffffff)>>>0; }
@@ -1352,7 +1353,6 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
     const tctx = tmp.getContext('2d');
     
-    // FPS -> Milliseconds
     const fpsVal = Number(document.getElementById('animFps').value) || 12;
     const durationMs = Math.round(1000 / fpsVal);
     
@@ -1363,7 +1363,7 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
       // 1. Signature
       parts.push(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
 
-      // 2. Generate Frames (Force TrueColor)
+      // 2. Generate Frames (Force TrueColor using Red Noise)
       const framesData = [];
       for(let i=0; i<animFrames.length; i++){
         const li = layers.findIndex(l=>l.id===animFrames[i]); if(li<0) continue;
@@ -1371,10 +1371,9 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
         tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,w,h);
         tctx.drawImage(layers[li].canvas, 0,0);
         
-        // 【重要】iPadの「勝手にパレット化」を防ぐための魔法
-        // 左上の1ピクセルに、目に見えないほどの微細な色ノイズを混ぜる
-        // これによりブラウザは「複雑な色だ」と判断し、強制的にTrueColor(RGBA)で出力する
-        tctx.fillStyle = 'rgba(255,255,255,0.01)';
+        // 【修正】白背景に「薄い赤」を置くことで、計算結果を (255, 252, 252) にする。
+        // これでiPadは「これは白黒画像ではない」と判断し、TrueColorモードで保存する。
+        tctx.fillStyle = 'rgba(255, 0, 0, 0.01)';
         tctx.fillRect(0, 0, 1, 1);
         
         const blob = await new Promise(r=>tmp.toBlob(r, 'image/png'));
@@ -1384,7 +1383,7 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
 
       if(framesData.length === 0) throw new Error("No frame data generated");
 
-      // 3. Header
+      // 3. Header Scan
       const f0 = framesData[0];
       let pos = 8;
       while(pos < f0.length){
@@ -1394,7 +1393,6 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
            const chunk = f0.slice(pos, pos + 12 + len);
            parts.push(chunk);
            
-           // Insert acTL
            const actlData = new Uint8Array(8);
            const view = new DataView(actlData.buffer);
            view.setUint32(0, framesData.length);
@@ -1406,11 +1404,10 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
         pos += 12 + len;
       }
 
-      // 4. Frames
+      // 4. Frames Process
       for(let i=0; i<framesData.length; i++){
         const frame = framesData[i];
         
-        // fcTL
         const fctl = new Uint8Array(26);
         const fview = new DataView(fctl.buffer);
         fview.setUint32(0, seq++);   
@@ -1424,7 +1421,6 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
         fview.setUint8(25, 0);       
         writeChunk("fcTL", fctl, parts);
 
-        // IDAT scan
         let p = 8;
         while(p < frame.length){
           const len = (frame[p]<<24)|(frame[p+1]<<16)|(frame[p+2]<<8)|frame[p+3];
@@ -1449,14 +1445,9 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
       // 5. IEND
       writeChunk("IEND", new Uint8Array(0), parts);
 
-      // 6. Flatten
-      let totalSize = 0;
-      for(const p of parts) totalSize += p.length;
-      const finalBytes = new Uint8Array(totalSize);
-      let offset = 0;
-      for(const p of parts){ finalBytes.set(p, offset); offset += p.length; }
-      
-      const blob = new Blob([finalBytes], {type:'image/png'});
+      // 6. Flatten (Optimized for iPad Memory)
+      // 配列を手動結合せず、Blobコンストラクタに任せる（メモリ効率向上）
+      const blob = new Blob(parts, {type:'image/png'});
       const ts = new Date().toISOString().replace(/[:.]/g,'-');
       downloadBlob(`AnimX_${ts}.png`, blob);
 
