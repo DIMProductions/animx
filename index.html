@@ -364,9 +364,77 @@
   let currentScale = 1.0;
 
   // iPad用ズーム変数
+// ---- 統合インタラクションエンジン（ズーム・描画・ピンチ分離） ----
   let isPinching = false;
   let initialPinchDist = null;
   let initialScale = 1.0;
+
+  // 1. マウスホイールでのズーム（PC用）
+  stageContainer.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY * -0.001;
+    let nextScale = Math.max(0.1, Math.min(4, currentScale + delta));
+    const rect = stageContainer.getBoundingClientRect();
+    zoomToPoint(nextScale, e.clientX - rect.left, e.clientY - rect.top);
+    elZoom.value = Math.round(nextScale * 100); vZoom.innerText = elZoom.value + '%';
+  }, { passive: false });
+
+  // 2. iPad ピンチズーム（2本指操作）
+  stageContainer.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      isPinching = true;
+      drawing = false; // ズーム開始時に描画を強制停止
+      gInput.clearRect(0, 0, baseW, baseH); pts = []; // プレビューの点を消去
+      initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      initialScale = currentScale;
+    }
+  }, { passive: false });
+
+  stageContainer.addEventListener('touchmove', e => {
+    if (e.touches.length >= 2 && initialPinchDist) {
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      let nextScale = Math.max(0.1, Math.min(4, initialScale * (d / initialPinchDist)));
+      const rect = stageContainer.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      zoomToPoint(nextScale, cx, cy);
+      elZoom.value = Math.round(nextScale * 100); vZoom.innerText = elZoom.value + '%';
+    }
+  }, { passive: false });
+
+  stageContainer.addEventListener('touchend', e => {
+    if (e.touches.length < 2) { isPinching = false; initialPinchDist = null; }
+  });
+
+  // 3. 描画ロジック（ペン・マウス）
+  cInput.addEventListener('pointerdown', e => {
+    if (currentTab !== 'draw' || isPinching) return;
+    // iPadで「指1本」での誤描画を防ぎたい場合は以下を有効にする
+    // if (e.pointerType === 'touch') return; 
+
+    const p = evPos(e, cInput);
+    if (toolType === 'select') { beginSelect(e); return; }
+    if (!layers[activeIdx] || !layers[activeIdx].visible) return;
+
+    drawing = true;
+    try { cInput.setPointerCapture(e.pointerId); } catch(_) {}
+    pts = [{x: p.x, y: p.y, p: e.pressure || 0.5}];
+    strokeStartData = layers[activeIdx].ctx.getImageData(0,0, baseW, baseH);
+  });
+
+  cInput.addEventListener('pointermove', e => {
+    if (!drawing || isPinching) return;
+    const p = evPos(e, cInput);
+    if (toolType === 'select') { moveSelect(e); return; }
+    
+    const raw = {x: p.x, y: p.y, p: e.pressure || 0.5};
+    const k = (toolType === 'shadow') ? 0.3 : (1.0 - penSettings.smooth);
+    const last = pts[pts.length-1];
+    pts.push({ x: last.x + (raw.x - last.x)*k, y: last.y + (raw.y - last.y)*k, p: raw.p });
+    drawPreview(gInput, pts);
+  });
 
   // レイヤー・描画変数
   let layers = [], activeIdx = 0;
