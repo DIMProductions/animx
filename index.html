@@ -1094,9 +1094,27 @@ cInput.addEventListener('pointerdown', e => {
   btnAnimStop && (btnAnimStop.onpointerdown = (e)=>{ e.preventDefault(); stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
   elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); }); elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
 
-  function downloadBlob(filename, blob){
-    const a=document.createElement('a'); a.download=filename; a.href=URL.createObjectURL(blob);
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 30000);
+  async function downloadBlob(filename, blob){
+    // showSaveFilePicker が使える環境（iOS 17+ Safari / Chrome等）はフォルダ選択ダイアログを出す
+    if (typeof showSaveFilePicker === 'function') {
+      try {
+        const ext = filename.split('.').pop().toLowerCase();
+        const mimeMap = { mp4: 'video/mp4', webp: 'image/webp', png: 'image/png', animx: 'application/octet-stream' };
+        const handle = await showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: filename, accept: { [mimeMap[ext] || 'application/octet-stream']: ['.' + ext] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') return; // ユーザーがキャンセル
+        // 失敗したら従来の方法にフォールバック
+      }
+    }
+    const a = document.createElement('a'); a.download = filename; a.href = URL.createObjectURL(blob);
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 30000);
   }
 
   document.getElementById('btnExportPNG').onclick=()=>{
@@ -1299,10 +1317,7 @@ cInput.addEventListener('pointerdown', e => {
       if (encError) throw encError;
 
       const outBlob = new Blob([target.buffer], { type: 'video/mp4' });
-      let base = prompt('ファイル名を入力:', 'AnimX_Video');
-      if (base === null) { btn.innerText = originalText; return; }
-      base = base.trim() || 'AnimX_Video';
-      downloadBlob(`${base}.mp4`, outBlob);
+      await downloadBlob('AnimX_Video.mp4', outBlob);
 
       redrawComposite();
       btn.innerText = originalText;
