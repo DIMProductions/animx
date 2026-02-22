@@ -1236,7 +1236,7 @@ cInput.addEventListener('pointerdown', e => {
     try {
       // mp4-muxer を動的インポート（jsDelivrから・CORS問題なし）
       btn.innerText = "Loading muxer...";
-      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.js');
+      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.mjs');
 
       const target = new ArrayBufferTarget();
       const muxer  = new Muxer({
