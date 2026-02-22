@@ -990,21 +990,28 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   }
 
-  cInput.addEventListener('pointerdown', e=>{ 
-    if(currentTab!=='draw') return;
+cInput.addEventListener('pointerdown', e => {
+    if (currentTab !== 'draw') return;
+
+    // ★Apple Pencil/マウス以外（指）、またはズーム中は描画しない
+    if (e.pointerType === 'touch' || isPinching) return;
+
     const p = evPos(e, cInput);
-    lastPointer = {x:p.x, y:p.y};
-    if(toolType==='select'){ beginSelect(e); try{ cInput.setPointerCapture(e.pointerId); selectionPointerId = e.pointerId; }catch(_){ } return; }
-    if(!layers[activeIdx].visible) return; 
-    drawing=true; 
+    lastPointer = {x: p.x, y: p.y};
+    
+    if (toolType === 'select') { beginSelect(e); return; }
+    if (!layers[activeIdx].visible) return; 
+
+    drawing = true; 
     cInput.setPointerCapture(e.pointerId); 
-    pts=[{x:p.x, y:p.y, p:e.pressure||0.5}];
+    pts = [{x: p.x, y: p.y, p: e.pressure || 0.5}];
     const ctx = layers[activeIdx].ctx; 
     strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
   });
 
-  cInput.addEventListener('pointermove', e=>{ 
-    if(currentTab!=='draw') return;
+  cInput.addEventListener('pointermove', e => {
+    // ★指やズーム中は描画スキップ
+    if (e.pointerType === 'touch' || isPinching) return;
     const p = evPos(e, cInput);
     lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ moveSelect(e); return; }
@@ -1406,24 +1413,43 @@ document.getElementById('btnExportANIMX').onclick = () => {
   });
 
 // --- ピンチズームの管理 ---
-  let isPinching = false; // ★ズーム中かどうかを判定するフラグ
+let isPinching = false;
   let initialPinchDist = null;
   let initialScale = 1.0;
 
+  // 1. ピンチズームの管理（キャンバスのコンテナ全体）
   stageContainer.addEventListener('touchstart', e => {
     if (e.touches.length >= 2) {
-      e.preventDefault();
-      
-      isPinching = true; // ★ズーム状態をON
-      drawing = false;   // ★ズームした瞬間に描画を強制キャンセル！
+      e.preventDefault(); // 画面全体のズームを阻止
+      isPinching = true;
+      drawing = false; // ズームした瞬間に描画を強制ストップ
 
       const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
       initialPinchDist = d;
-      initialScale = currentScale; // (もし独自の変数名があればそれに合わせてください)
+      initialScale = currentScale; // (もしズーム変数が違う名前なら変更してください)
     }
   }, { passive: false });
 
-  // 指が離れたらズーム状態を解除
+  stageContainer.addEventListener('touchmove', e => {
+    if (e.touches.length >= 2 && initialPinchDist) {
+      e.preventDefault();
+      
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      const ratio = d / initialPinchDist;
+      let nextScale = initialScale * ratio;
+      nextScale = Math.max(0.1, Math.min(4, nextScale));
+      
+      const rect = stageContainer.getBoundingClientRect();
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      
+      zoomToPoint(nextScale, centerX, centerY);
+      
+      elZoom.value = Math.round(nextScale * 100);
+      vZoom.innerText = elZoom.value + '%';
+    }
+  }, { passive: false });
+
   stageContainer.addEventListener('touchend', e => {
     if (e.touches.length < 2) {
       isPinching = false;
