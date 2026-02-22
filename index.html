@@ -6,7 +6,6 @@
   <title>AnimX</title>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#001a33">
-  <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/assets/apple-touch-icon.png" type="image/png">
   <style>
     :root{
@@ -20,73 +19,44 @@
       background:var(--bg); color:var(--text); height:100vh; overflow:hidden;
     }
 
-    /* Top Bar */
-.topbar {
+    .topbar {
       height: 54px;
       background: linear-gradient(180deg, #0f131b, #0b0e14);
       border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      position: relative; /* 中央配置の基準 */
+      display: flex; align-items: center; padding: 0 20px; position: relative;
     }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      z-index: 2; /* タイトルより前面に */
-    }
-
-    /* タイトルを画面の真ん中に固定 */
+    .topbar-left { display: flex; align-items: center; gap: 15px; z-index: 2; }
     .topbar-center {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      font-weight: 800;
-      font-size: 18px;
-      letter-spacing: 3px;
-      color: var(--text);
-      white-space: nowrap;
-      pointer-events: none; /* 下の要素の操作を邪魔しない */
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      font-weight: 800; font-size: 18px; letter-spacing: 3px; color: var(--text);
+      white-space: nowrap; pointer-events: none;
     }
-
-    .topbar-right {
-      margin-left: auto; /* 右端に寄せる */
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 2;
-    }
-    .brand{ font-weight:700; font-size:13px; padding:6px 10px; border:1px solid var(--line); background:#0d1016; border-radius:10px; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; z-index: 2; }
+    
     .tabs{ display:flex; gap:6px; align-items:center; }
     .tab{
-      border:1px solid var(--line); background:#0d1118; color:var(--text); padding:8px 12px; border-radius:10px; font-size:12px; cursor:pointer; user-select:none;
+      border:1px solid var(--line); background:#0d1118; color:var(--text); padding:8px 12px; 
+      border-radius:10px; font-size:12px; cursor:pointer; user-select:none;
     }
     .tab.on{ border-color:var(--accent); box-shadow:0 0 0 1px rgba(0,208,255,.25) inset; }
     
     .support-link{ 
-      margin-left:auto; text-decoration:none; display:flex; align-items:center; gap:6px;
+      text-decoration:none; display:flex; align-items:center; gap:6px;
       font-size:11px; color:var(--text); padding:6px 12px; border:1px solid var(--line); 
       border-radius:10px; background:#0d1016; transition: 0.2s;
     }
     .support-link:hover{ border-color: var(--kofi); background: rgba(255, 94, 91, 0.1); }
     .support-link img{ height:14px; }
 
-    /* Layout */
     .main{ height:calc(100vh - 54px); display:grid; grid-template-columns: 240px 1fr 260px; gap:12px; padding:12px; }
     .panel{ background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto; }
     .panel h3{ margin:0 0 4px; font-size:12px; color:var(--muted); letter-spacing:0.2px; border-bottom:1px solid #222; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center; }
     
     .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-   .btn{ 
-      border:1px solid var(--line); 
-      background:var(--ui2); color:var(--text); padding:8px 10px; border-radius:12px; 
+    .btn{ 
+      border:1px solid var(--line); background:var(--ui2); color:var(--text); padding:8px 10px; border-radius:12px; 
       font-size:12px; cursor:pointer; user-select:none; text-align:center; flex:1; transition:0.1s;
-      
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     .btn:hover{ filter:brightness(1.2); }
     .btn.active{ background:var(--accent); color:#000; border-color:var(--accent); font-weight:bold; }
@@ -98,7 +68,6 @@
     label{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
     input[type="range"]{ width:100%; margin:4px 0; }
 
-    /* Toggle Switch */
     .toggle { appearance:none; width:28px; height:16px; background:#222; border-radius:10px; border:1px solid #444; position:relative; outline:none; cursor:pointer; vertical-align:middle; }
     .toggle::after { content:''; position:absolute; top:1px; left:1px; width:12px; height:12px; background:#666; border-radius:50%; transition:0.2s; }
     .toggle:checked { background:var(--accent); border-color:var(--accent); }
@@ -106,62 +75,31 @@
 
     .tabSlot{ display:none; }
     .tabSlot.on{ display:block; }
-
-    /* Control Groups */
     .grp-gpen, .grp-shadow { display:none; }
     .show-gpen .grp-gpen { display:block; }
     .show-shadow .grp-shadow { display:block; }
 
-    /* Stage Area (Scrollable) */
     .stageWrap{ 
       background:var(--ui); border:1px solid var(--line); border-radius:14px; padding:12px; 
-      min-height:0; display:flex; flex-direction:column; gap:10px; 
-      overflow: hidden; 
+      min-height:0; display:flex; flex-direction:column; gap:10px; overflow: hidden; 
     }
     
-    /* FIX: Use CSS Grid + Auto Margins for perfect center/scroll behavior */
-    .stageContainer {
-      flex: 1; 
-      overflow: auto; 
-      background: #101216; 
-      border-radius: 4px;
-      display: grid; /* Grid is robust for this */
-      /* No place-items: center here, let margin:auto do it to preserve scroll */
-    }
-
-    /* Invisible wrapper to force scrollbars when zoomed */
-    #canvasScaleTarget {
-      margin: auto; /* KEY: Centers content if smaller than view, stays put if larger */
-      display: block;
-      position: relative;
-      /* Size will be set by JS */
-    }
+    .stageContainer { flex: 1; overflow: auto; background: #101216; border-radius: 4px; display: grid; }
+    #canvasScaleTarget { margin: auto; display: block; position: relative; }
     
-    /* Stage (The actual canvas) */
-.stage { 
-      position: relative; 
-      background: var(--canvas); 
-      overflow: hidden; 
-      touch-action: none; 
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-
-      /* カーソル修正版：外側を黒、内側をシアンにして視認性をアップ */
+    .stage { 
+      position: relative; background: var(--canvas); overflow: hidden; 
+      touch-action: none; box-shadow: 0 0 20px rgba(0,0,0,0.5);
       cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='%2300d0ff' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
-      
       transform-origin: 0 0;
     }
 
     #refContainer {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      overflow: hidden; z-index: 0;
-      opacity: 0.5; pointer-events: none;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      overflow: hidden; z-index: 0; opacity: 0.5; pointer-events: none;
       width: 280px; height: 300px; display: none; 
     }
-    #refImage {
-      display: block; position: absolute; top: 0; left: 0;
-      transform-origin: 0 0; will-change: transform;
-    }
+    #refImage { display: block; position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
     canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index: 10; }
 
     .stageHeader{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
@@ -177,7 +115,6 @@
     .moveBtn{ font-size:8px; padding:2px 4px; border:1px solid var(--line); border-radius:4px; cursor:pointer; background:#222; color:#aaa; line-height:1; }
     .moveBtn:hover{ background:var(--accent); color:#000; }
   
-    /* AnimX Animation UI */
     .animThumbs{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
     .thumbItem{ border:1px solid var(--line); border-radius:10px; padding:6px; cursor:pointer; background:rgba(255,255,255,0.02); }
     .thumbItem:hover{ background:rgba(255,255,255,0.04); }
@@ -194,7 +131,6 @@
     .seqBtn{ font-size:11px; padding:4px 8px; border:1px solid var(--line); border-radius:10px; cursor:pointer; user-select:none; }
     .seqBtn:hover{ background:rgba(255,255,255,0.04); }
 
-/* ---- Help Modal Styles ---- */
     .modal-overlay {
       display: none; position: fixed; inset: 0; background: rgba(10, 13, 18, 0.8);
       z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);
@@ -213,9 +149,7 @@
     .modal-header h2 { margin: 0; font-size: 15px; color: var(--text); }
     .close-btn { cursor: pointer; font-size: 22px; color: var(--muted); line-height: 1; transition: 0.1s; }
     .close-btn:hover { color: var(--danger); }
-    .modal-body {
-      padding: 18px; overflow-y: auto; font-size: 13px; color: var(--muted); line-height: 1.6;
-    }
+    .modal-body { padding: 18px; overflow-y: auto; font-size: 13px; color: var(--muted); line-height: 1.6; }
     .modal-body h3 { color: var(--accent); font-size: 14px; margin: 18px 0 8px 0; border-bottom: 1px solid #222; padding-bottom: 4px; }
     .modal-body h3:first-child { margin-top: 0; }
     .modal-body ul { margin: 0; padding-left: 20px; }
@@ -224,20 +158,7 @@
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(10px); } to { transform: translateY(0); } }
-
-/* stageのtouch-actionを調整 */
-    .stage { 
-      position: relative; 
-      background: var(--canvas); 
-      overflow: hidden; 
-      /* 指でのスクロールを許可し、ブラウザの拡大を防止 */
-      touch-action: pinch-zoom; 
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      cursor: crosshair;
-      transform-origin: 0 0;
-    }
-
-</style>
+  </style>
 </head>
 
 <body>
@@ -257,7 +178,6 @@
 
   <div class="topbar-right">
     <div class="tab" id="btnHelp" style="color: var(--accent); border-color: rgba(0,208,255,.3); cursor:pointer;">HELP</div>
-    
     <a href="https://ko-fi.com/dimproductions" target="_blank" class="support-link">
       <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi">
       <span>Support us</span>
@@ -265,241 +185,241 @@
   </div>
 </div>
 
-  <div id="helpModal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>AnimX Quick Guide</h2>
-        <span class="close-btn" id="btnCloseHelp">&times;</span>
-      </div>
-      <div class="modal-body">
-        <h3>1. DRAW (Drawing & Layers)</h3>
-        <ul>
-          <li><strong>Tools:</strong> Use the <b>G-Pen</b> for clean, pressure-sensitive lines, or the <b>Shadow</b> tool for watercolor-like blending.</li>
-          <li><strong>3D Reference:</strong> Toggle the 3D reference and adjust Yaw/Pitch to guide your character's angles.</li>
-          <li><strong>Layers:</strong> Each layer can act as a single frame for your animation. Add, duplicate, or reorder them in the right panel.</li>
-        </ul>
-
-        <h3>2. ANIMATION (Animation Sequence)</h3>
-        <ul>
-          <li>Switch to the <strong>ANIMATION</strong> tab to start building your animation timeline.</li>
-          <li>Click on a layer thumbnail to append it to your <strong>Sequence</strong>.</li>
-          <li><strong>Drag & Drop</strong> items in the Sequence list to reorder them, or use the Copy/Del buttons.</li>
-          <li>Adjust the <strong>FPS</strong> (speed) and hit <strong>Play</strong> to preview your work.</li>
-        </ul>
-
-        <h3>3. EXPORT (Save & Share)</h3>
-        <ul>
-          <li>Go to the <strong>IMPORT/EXPORT</strong> tab when you are ready.</li>
-          <li><strong>Export MP4 (iPad):</strong> The most reliable format for iOS and social media sharing.</li>
-          <li><strong>Export .animx:</strong> Saves your entire project (layers, sequences, and settings) so you can import and edit it later.</li>
-        </ul>
-      </div>
+<div id="helpModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>AnimX Quick Guide</h2>
+      <span class="close-btn" id="btnCloseHelp">&times;</span>
+    </div>
+    <div class="modal-body">
+      <h3>1. DRAW (Drawing & Layers)</h3>
+      <ul>
+        <li><strong>Tools:</strong> Use the <b>G-Pen</b> for clean, pressure-sensitive lines, or the <b>Shadow</b> tool for watercolor-like blending.</li>
+        <li><strong>3D Reference:</strong> Toggle the 3D reference and adjust Yaw/Pitch to guide your character's angles.</li>
+        <li><strong>Layers:</strong> Each layer can act as a single frame for your animation. Add, duplicate, or reorder them in the right panel.</li>
+      </ul>
+      <h3>2. ANIMATION (Animation Sequence)</h3>
+      <ul>
+        <li>Switch to the <strong>ANIMATION</strong> tab to start building your animation timeline.</li>
+        <li>Click on a layer thumbnail to append it to your <strong>Sequence</strong>.</li>
+        <li><strong>Drag & Drop</strong> items in the Sequence list to reorder them, or use the Copy/Del buttons.</li>
+        <li>Adjust the <strong>FPS</strong> (speed) and hit <strong>Play</strong> to preview your work.</li>
+      </ul>
+      <h3>3. EXPORT (Save & Share)</h3>
+      <ul>
+        <li>Go to the <strong>IMPORT/EXPORT</strong> tab when you are ready.</li>
+        <li><strong>Export MP4 (iPad):</strong> The most reliable format for iOS and social media sharing.</li>
+        <li><strong>Export .animx:</strong> Saves your entire project (layers, sequences, and settings) so you can import and edit it later.</li>
+      </ul>
     </div>
   </div>
+</div>
 
-  <div class="main">
-    <div class="panel">
-      
-      <div id="slot-draw" class="tabSlot on show-gpen"> 
-        <h3>TOOLS</h3>
-        <div class="row">
-          <div class="btn active" id="toolPen">G-Pen</div>
-          <div class="btn" id="toolShadow">Shadow</div>
-          <div class="btn" id="toolEraser">Eraser</div>
-        </div>
-        <div class="row" style="margin-top:8px;">
-           <div class="btn" id="toolSelect">Select</div>
-        </div>
-        <div class="row" style="margin-top:8px;">
-            <div class="btn small" id="btnUndo">↶ Undo</div>
-            <div class="btn small" id="btnRedo">↷ Redo</div>
-        </div>
-        <div class="row" style="margin-top:8px;">
-            <div class="btn small" id="btnCopy">⎘ Copy</div>
-            <div class="btn small" id="btnCut">✂ Cut</div>
-            <div class="btn small danger" id="btnDelete">⌫ Delete</div>
-            <div class="btn small" id="btnPaste">⎘ Paste</div>
-        </div>
-
-        <div class="row" style="margin-top:8px;">
-            <div class="btn small active" id="dragModeMove">Drag: Move</div>
-            <div class="btn small" id="dragModeCopy">Drag: Copy</div>
-        </div>
-
-        <div class="sep"></div>
-        <h3>CANVAS ZOOM</h3>
-        <label>Zoom <span id="vCanvasZoom">100%</span></label>
-        <input id="canvasZoom" type="range" min="10" max="400" value="100" step="10">
-
-        <div class="sep"></div>
-        <h3>PEN SETTINGS</h3>
-        <label>Size <span id="vSize">4.0</span></label>
-        <input id="penSize" type="range" min="1" max="100" value="4">
-        
-        <div class="grp-gpen">
-            <label>Taper <span id="vTaper">0.5</span></label>
-            <input id="penTaper" type="range" min="0" max="1" value="0.5" step="0.05">
-            <label>Pressure <span id="vPress">0.8</span></label>
-            <input id="penPress" type="range" min="0" max="1" value="0.8" step="0.05">
-            <label>Smooth <span id="vSmooth">0.4</span></label>
-            <input id="penSmooth" type="range" min="0" max="0.95" value="0.4" step="0.05">
-        </div>
-
-        <div class="grp-shadow">
-            <label title="Lower = more layers needed to darken">Flow (Opacity) <span id="vFlow">0.08</span></label>
-            <input id="shadowFlow" type="range" min="0.01" max="0.5" value="0.08" step="0.01">
-            <label title="Edge softness and spread">Wet (Bleed) <span id="vWet">0.75</span></label>
-            <input id="shadowWet" type="range" min="0.1" max="1.0" value="0.75" step="0.05">
-        </div>
-
-        <div class="sep"></div>
-        <h3>
-            REFERENCE (3D)
-            <input type="checkbox" id="refToggle" class="toggle" checked title="Toggle Reference ON/OFF">
-        </h3>
-        
-        <label>Yaw (Rotate) <span id="vYaw">0°</span></label>
-        <input id="traceYaw" type="range" min="-2" max="2" step="1" value="0">
-        
-        <label>Pitch (Tilt) <span id="vPitch">0°</span></label>
-        <input id="tracePitch" type="range" min="-2" max="2" step="1" value="0">
-        
-        <label>Opacity <span id="vRefOp">0.5</span></label>
-        <input id="refOp" type="range" min="0" max="1" step="0.05" value="0.5">
-
-        <div class="sep"></div>
-        <div class="btn danger" id="btnClearActive">Clear Layer</div>
-      </div>
-
-      <div id="slot-export" class="tabSlot">
-        <h3>EXPORT</h3>
-        <div class="btn accent" id="btnImportANIMX">Import .animx</div>
-        <div class="btn accent" id="btnExportANIMX">Export .animx</div>
-        <div class="btn accent" id="btnExportPNG">Export PNG</div>
-        <input id="fileImportAnimx" type="file" accept="*" style="display:none" />
-        <div class="btn accent" id="btnExportAnimWebP">Export Animated WebP</div>
-        <div class="btn accent" id="btnExportAnimMP4">Export MP4(iPad)</div> 
-        <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
-      </div>
-
-      <div id="slot-anim" class="tabSlot">
-        <h3>ANIMATION</h3>
-        <div class="row" style="margin-top:8px;">
-          <div class="btn small" id="btnAnimPlay">Play</div>
-          <div class="btn small" id="btnAnimStop">Stop</div>
-        </div>
-        <label style="margin-top:8px;">FPS <span id="vAnimFps">12</span></label>
-        <input id="animFps" type="range" min="1" max="30" value="12" step="1">
-        <label style="margin-top:8px;">Loop (0=∞) <span id="vAnimLoop">0</span></label>
-        <input id="animLoop" type="range" min="0" max="30" value="0" step="1">
-        <div class="sep"></div>
-        <div class="hint" style="font-size:10px; margin-bottom:6px;">Thumbnails = LAYERS. Click to append. Drag in Sequence to reorder.</div>
-        <div class="animThumbs" id="animThumbs"></div>
-        <div class="sep"></div>
-        <h3 style="margin-top:0;">SEQUENCE</h3>
-        <div class="animSeq" id="animSeq"></div>
-      </div>
-    </div>
-
-    <div class="stageWrap">
-      <div class="stageHeader"><div class="mini">Canvas: Auto-Fit</div></div>
-      <div class="stageContainer">
-        <div id="canvasScaleTarget"> <div class="stage" id="stage">
-                <div id="refContainer">
-                    <img id="refImage" src="source/loomis_source.svg" alt="Loomis Grid">
-                </div>
-                <canvas id="composite"></canvas>
-                <canvas id="input"></canvas>
-            </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>LAYERS</h3>
+<div class="main">
+  <div class="panel">
+    <div id="slot-draw" class="tabSlot on show-gpen"> 
+      <h3>TOOLS</h3>
       <div class="row">
-        <div class="btn accent small" id="btnAddLayer">+ New</div>
-        <div class="btn small" id="btnDupLayer">Copy</div>
-        <div class="btn danger small" id="btnDelLayer">Del</div>
+        <div class="btn active" id="toolPen">G-Pen</div>
+        <div class="btn" id="toolShadow">Shadow</div>
+        <div class="btn" id="toolEraser">Eraser</div>
       </div>
-      <label>Opacity <span id="vLayerOp">1.0</span></label>
-      <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
+      <div class="row" style="margin-top:8px;">
+         <div class="btn" id="toolSelect">Select</div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+          <div class="btn small" id="btnUndo">↶ Undo</div>
+          <div class="btn small" id="btnRedo">↷ Redo</div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+          <div class="btn small" id="btnCopy">⎘ Copy</div>
+          <div class="btn small" id="btnCut">✂ Cut</div>
+          <div class="btn small danger" id="btnDelete">⌫ Delete</div>
+          <div class="btn small" id="btnPaste">⎘ Paste</div>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+          <div class="btn small active" id="dragModeMove">Drag: Move</div>
+          <div class="btn small" id="dragModeCopy">Drag: Copy</div>
+      </div>
+
       <div class="sep"></div>
-      <div class="layersList" id="layersList"></div>
+      <h3>CANVAS ZOOM</h3>
+      <label>Zoom <span id="vCanvasZoom">100%</span></label>
+      <input id="canvasZoom" type="range" min="10" max="400" value="100" step="10">
+
+      <div class="sep"></div>
+      <h3>PEN SETTINGS</h3>
+      <label>Size <span id="vSize">4.0</span></label>
+      <input id="penSize" type="range" min="1" max="100" value="4">
+      
+      <div class="grp-gpen">
+          <label>Taper <span id="vTaper">0.5</span></label>
+          <input id="penTaper" type="range" min="0" max="1" value="0.5" step="0.05">
+          <label>Pressure <span id="vPress">0.8</span></label>
+          <input id="penPress" type="range" min="0" max="1" value="0.8" step="0.05">
+          <label>Smooth <span id="vSmooth">0.4</span></label>
+          <input id="penSmooth" type="range" min="0" max="0.95" value="0.4" step="0.05">
+      </div>
+
+      <div class="grp-shadow">
+          <label title="Lower = more layers needed to darken">Flow (Opacity) <span id="vFlow">0.08</span></label>
+          <input id="shadowFlow" type="range" min="0.01" max="0.5" value="0.08" step="0.01">
+          <label title="Edge softness and spread">Wet (Bleed) <span id="vWet">0.75</span></label>
+          <input id="shadowWet" type="range" min="0.1" max="1.0" value="0.75" step="0.05">
+      </div>
+
+      <div class="sep"></div>
+      <h3>REFERENCE (3D) <input type="checkbox" id="refToggle" class="toggle" checked title="Toggle Reference ON/OFF"></h3>
+      <label>Yaw (Rotate) <span id="vYaw">0°</span></label>
+      <input id="traceYaw" type="range" min="-2" max="2" step="1" value="0">
+      <label>Pitch (Tilt) <span id="vPitch">0°</span></label>
+      <input id="tracePitch" type="range" min="-2" max="2" step="1" value="0">
+      <label>Opacity <span id="vRefOp">0.5</span></label>
+      <input id="refOp" type="range" min="0" max="1" step="0.05" value="0.5">
+
+      <div class="sep"></div>
+      <div class="btn danger" id="btnClearActive">Clear Layer</div>
+    </div>
+
+    <div id="slot-export" class="tabSlot">
+      <h3>EXPORT</h3>
+      <div class="btn accent" id="btnImportANIMX">Import .animx</div>
+      <div class="btn accent" id="btnExportANIMX">Export .animx</div>
+      <div class="btn accent" id="btnExportPNG">Export PNG</div>
+      <input id="fileImportAnimx" type="file" accept="*" style="display:none" />
+      <div class="btn accent" id="btnExportAnimWebP">Export Animated WebP</div>
+      <div class="btn accent" id="btnExportAnimMP4">Export MP4(iPad)</div> 
+      <div class="hint" style="margin-top:8px; font-size:10px;">Saves canvas + reference.</div>
+    </div>
+
+    <div id="slot-anim" class="tabSlot">
+      <h3>ANIMATION</h3>
+      <div class="row" style="margin-top:8px;">
+        <div class="btn small" id="btnAnimPlay">Play</div>
+        <div class="btn small" id="btnAnimStop">Stop</div>
+      </div>
+      <label style="margin-top:8px;">FPS <span id="vAnimFps">12</span></label>
+      <input id="animFps" type="range" min="1" max="30" value="12" step="1">
+      <label style="margin-top:8px;">Loop (0=∞) <span id="vAnimLoop">0</span></label>
+      <input id="animLoop" type="range" min="0" max="30" value="0" step="1">
+      <div class="sep"></div>
+      <div class="hint" style="font-size:10px; margin-bottom:6px;">Thumbnails = LAYERS. Click to append. Drag in Sequence to reorder.</div>
+      <div class="animThumbs" id="animThumbs"></div>
+      <div class="sep"></div>
+      <h3 style="margin-top:0;">SEQUENCE</h3>
+      <div class="animSeq" id="animSeq"></div>
     </div>
   </div>
+
+  <div class="stageWrap">
+    <div class="stageHeader"><div class="mini">Canvas: Auto-Fit</div></div>
+    <div class="stageContainer">
+      <div id="canvasScaleTarget"> 
+        <div class="stage" id="stage">
+          <div id="refContainer">
+              <img id="refImage" src="source/loomis_source.svg" alt="Loomis Grid">
+          </div>
+          <canvas id="composite"></canvas>
+          <canvas id="input"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>LAYERS</h3>
+    <div class="row">
+      <div class="btn accent small" id="btnAddLayer">+ New</div>
+      <div class="btn small" id="btnDupLayer">Copy</div>
+      <div class="btn danger small" id="btnDelLayer">Del</div>
+    </div>
+    <label>Opacity <span id="vLayerOp">1.0</span></label>
+    <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
+    <div class="sep"></div>
+    <div class="layersList" id="layersList"></div>
+  </div>
+</div>
 
 <script>
 (() => {
+  // ==========================================
+  // 1. 変数の初期化とDOMの取得 (ここで全て宣言)
+  // ==========================================
   const tabs = document.querySelectorAll('.tab');
   const slots = { draw:document.getElementById('slot-draw'), export:document.getElementById('slot-export'), anim:document.getElementById('slot-anim') };
   const refContainer = document.getElementById('refContainer'); 
-  let currentTab = 'draw';
-
-  function setTab(m){
-    currentTab = m;
-    tabs.forEach(t=>t.classList.toggle('on', t.dataset.tab===m));
-    Object.values(slots).forEach(e=>e && e.classList.remove('on'));
-    if(slots[m]) slots[m].classList.add('on');
-    // Tab-specific view refresh
-    if(m==='anim'){ updateAnimUI(); renderAnimFrame(activeAnimIdx); }
-    else { stopAnimPlayback(); redrawComposite(); }
-  }
-  tabs.forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
-
-  const stage=document.getElementById('stage'), cComp=document.getElementById('composite'), cInput=document.getElementById('input');
-  const gComp=cComp.getContext('2d'), gInput=cInput.getContext('2d');
-  
-  // Base dimensions (physical)
-  let baseW=800, baseH=600;
-
-  function resizeCanvasBase(){
-    const cont = document.querySelector('.stageContainer');
-    const r = cont.getBoundingClientRect();
-    // Default: fit to container minus padding
-    baseW = Math.floor(r.width - 40); 
-    baseH = Math.floor(r.height - 40);
-    if(baseW<100) baseW=100; if(baseH<100) baseH=100;
-    
-    // Set internal resolution
-    cComp.width = cInput.width = baseW;
-    cComp.height = cInput.height = baseH;
-    
-    // Set initial display size (100%)
-    applyZoom(1.0);
-    
-    ensureLayerSize(); redrawComposite();
-    history = []; historyStep = -1; 
-  }
-  
-  // Zoom logic
+  const stage = document.getElementById('stage');
+  const cComp = document.getElementById('composite');
+  const cInput = document.getElementById('input');
+  const gComp = cComp.getContext('2d');
+  const gInput = cInput.getContext('2d', {willReadFrequently:true});
+  const stageContainer = document.querySelector('.stageContainer');
   const elZoom = document.getElementById('canvasZoom');
   const vZoom = document.getElementById('vCanvasZoom');
   const elScaleTarget = document.getElementById('canvasScaleTarget');
-  const stageContainer = document.querySelector('.stageContainer');
+
+  let currentTab = 'draw';
+  let baseW = 800, baseH = 600;
   let currentScale = 1.0;
-  
+
+  // iPad用ズーム変数
+  let isPinching = false;
+  let initialPinchDist = null;
+  let initialScale = 1.0;
+
+  // レイヤー・描画変数
+  let layers = [], activeIdx = 0;
+  let __layerSeq = 0;
+  let drawing = false, pts = [];
+  let toolType = 'pen';
+  let strokeStartData = null;
+  let lastPointer = {x:0, y:0};
+
+  // 選択・クリップボード変数
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
+  let selectionPointerId = null;
+  let dragMode = 'move';
+  let __clipboard = null;
+
+  // アニメーション変数
+  let animFrames = [], activeAnimIdx = 0;
+  let animPlaying = false, animTimer = null, animLoopsRemaining = 0;
+
+  // 履歴（Undo/Redo）変数
+  let history = [], historyStep = -1;
+  const MAX_HISTORY = 20;
+
+  // ツール設定
+  const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
+  const shadowSettings = { flow:0.04, wet:0.82, grain:0.25, spacing:0.12, edgeDark: 0.55 };
+
+  // ==========================================
+  // 2. キャンバス・ズーム・タブ初期化
+  // ==========================================
+  function setTab(m){
+    if(!m) return;
+    currentTab = m;
+    tabs.forEach(t => { if(t.dataset.tab) t.classList.toggle('on', t.dataset.tab === m); });
+    Object.values(slots).forEach(e => e && e.classList.remove('on'));
+    if(slots[m]) slots[m].classList.add('on');
+    if(m === 'anim'){ updateAnimUI(); renderAnimFrame(activeAnimIdx); }
+    else { stopAnimPlayback(); redrawComposite(); }
+  }
+  tabs.forEach(t => {
+    if(t.dataset.tab) t.addEventListener('click', () => setTab(t.dataset.tab));
+  });
+
+  function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+
   function applyZoom(scale){
     currentScale = scale;
     stage.style.width = baseW + 'px';
     stage.style.height = baseH + 'px';
     stage.style.transform = `scale(${scale})`;
-    
-    const targetW = Math.floor(baseW * scale);
-    const targetH = Math.floor(baseH * scale);
-    elScaleTarget.style.width = targetW + 'px';
-    elScaleTarget.style.height = targetH + 'px';
+    elScaleTarget.style.width = Math.floor(baseW * scale) + 'px';
+    elScaleTarget.style.height = Math.floor(baseH * scale) + 'px';
   }
-
-  // Slider Zoom -> Zoom to Center
-  elZoom.oninput = (e) => {
-    const nextScale = +e.target.value / 100;
-    vZoom.innerText = +e.target.value + '%';
-    const rect = stageContainer.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    zoomToPoint(nextScale, cx, cy);
-  };
 
   function zoomToPoint(nextScale, ox, oy){
     const pX = (ox + stageContainer.scrollLeft) / currentScale;
@@ -509,21 +429,74 @@
     stageContainer.scrollTop = (pY * nextScale) - oy;
   }
 
-  // Wheel zoom -> Zoom to Mouse
-// ページ全体のスクロールやズームを防止しつつ、キャンバス内だけ処理する
+  function resizeCanvasBase(){
+    const cont = document.querySelector('.stageContainer');
+    if(!cont) return;
+    const r = cont.getBoundingClientRect();
+    baseW = Math.floor(r.width - 40); 
+    baseH = Math.floor(r.height - 40);
+    if(baseW < 100) baseW = 100; if(baseH < 100) baseH = 100;
+    
+    cComp.width = cInput.width = baseW;
+    cComp.height = cInput.height = baseH;
+    
+    applyZoom(1.0);
+    ensureLayerSize(); redrawComposite();
+    history = []; historyStep = -1; 
+  }
+
+  // ==========================================
+  // 3. イベントリスナー (UI & iPadタッチ)
+  // ==========================================
+  elZoom.oninput = (e) => {
+    const nextScale = +e.target.value / 100;
+    vZoom.innerText = +e.target.value + '%';
+    const rect = stageContainer.getBoundingClientRect();
+    zoomToPoint(nextScale, rect.width / 2, rect.height / 2);
+  };
+
+// マウスホイールでのズーム処理
+  stageContainer.addEventListener('wheel', e => {
+    // ページ全体のズームを阻止
+    e.preventDefault(); 
+    
+    // スクロール量に応じて倍率を計算 (0.001は感度の調整値)
+    const delta = e.deltaY * -0.001;
+    let nextScale = currentScale + delta;
+    
+    // ズーム範囲を 10% ～ 400% に制限
+    nextScale = Math.max(0.1, Math.min(4, nextScale));
+    
+    // マウスカーソルの位置を基準にズームを実行
+    const rect = stageContainer.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    zoomToPoint(nextScale, mouseX, mouseY);
+    
+    // UI（スライダーと数値表示）を同期させる
+    elZoom.value = Math.round(nextScale * 100);
+    vZoom.innerText = elZoom.value + '%';
+  }, { passive: false }); // preventDefaultを有効にするために必要
+
   stageContainer.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      e.preventDefault(); // ブラウザのズームを阻止
+    if (e.touches.length >= 2) {
+      e.preventDefault(); 
+      isPinching = true; 
+      if (drawing) { 
+        drawing = false;
+        gInput.clearRect(0,0,cInput.width,cInput.height);
+        pts = [];
+      }
       const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
       initialPinchDist = d;
       initialScale = currentScale;
     }
-  }, { passive: false }); // preventDefaultを使うために passive: false にする
+  }, { passive: false }); 
 
   stageContainer.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && initialPinchDist) {
-      e.preventDefault(); // ここでもブラウザの挙動を阻止
-      
+    if (e.touches.length >= 2 && initialPinchDist) {
+      e.preventDefault(); 
       const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
       const ratio = d / initialPinchDist;
       let nextScale = initialScale * ratio;
@@ -534,36 +507,47 @@
       const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
       
       zoomToPoint(nextScale, centerX, centerY);
-      
       elZoom.value = Math.round(nextScale * 100);
       vZoom.innerText = elZoom.value + '%';
     }
-  }, { passive: false }); // 大事：passive: false
+  }, { passive: false });
 
-  window.addEventListener('load', resizeCanvasBase);
+  stageContainer.addEventListener('touchend', e => {
+    if (e.touches.length < 2) {
+      isPinching = false;
+      initialPinchDist = null;
+    }
+  });
 
-  let layers=[], activeIdx=0;
-  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
-  let selectionPointerId = null; 
-  let dragMode = 'move'; 
-  let lastPointer = {x:0,y:0};
-  let __layerSeq=0;
-  
-  // AnimX animation state
-  let animFrames=[];
-  let activeAnimIdx=0;
-  let animPlaying=false;
-  let animTimer=null;
-  let animLoopsRemaining=0;
+  const btnHelp = document.getElementById('btnHelp');
+  const helpModal = document.getElementById('helpModal');
+  const btnCloseHelp = document.getElementById('btnCloseHelp');
+  if (btnHelp && helpModal && btnCloseHelp) {
+    btnHelp.onclick = () => helpModal.classList.add('show');
+    btnCloseHelp.onclick = () => helpModal.classList.remove('show');
+    helpModal.onpointerdown = (e) => { if (e.target === helpModal) helpModal.classList.remove('show'); };
+  }
 
-  function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
-  
+  // ==========================================
+  // 4. レイヤー & アンドゥ ロジック
+  // ==========================================
+  function ensureLayerSize(){
+    layers.forEach(L=>{
+      if(L.canvas.width!==cComp.width || L.canvas.height!==cComp.height){
+        const c=makeCanvas(cComp.width, cComp.height); 
+        const cx=c.getContext('2d', {willReadFrequently:true});
+        cx.drawImage(L.canvas,0,0); L.canvas=c; L.ctx=cx;
+      }
+    });
+  }
+
   function addLayer(name){
     const c=makeCanvas(cComp.width, cComp.height);
     const id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
     layers.unshift({id, name, visible:true, opacity:1, canvas:c, ctx:c.getContext('2d', {willReadFrequently:true})});
     activeIdx=0; updateLayerUI();
   }
+
   function moveLayer(idx, dir){
     const newIdx = idx + dir;
     if(newIdx < 0 || newIdx >= layers.length) return;
@@ -571,6 +555,7 @@
     if(activeIdx === idx) activeIdx = newIdx; else if(activeIdx === newIdx) activeIdx = idx;
     updateLayerUI(); redrawComposite();
   }
+
   function updateLayerUI(){
     const list=document.getElementById('layersList'); list.innerHTML='';
     layers.forEach((L,i)=>{
@@ -581,194 +566,34 @@
         <div class="eye">${L.visible?'👁':'·'}</div>
         <div class="lname">${L.name}</div>
         <div class="moveBtns"><div class="moveBtn up">▲</div><div class="moveBtn down">▼</div></div>
-        <div class="op">${L.opacity.toFixed(1)}</div>
-      `;
+        <div class="op">${L.opacity.toFixed(1)}</div>`;
       el.querySelector('.eye').onclick=(e)=>{e.stopPropagation(); L.visible=!L.visible; updateLayerUI(); redrawComposite();};
       el.querySelector('.moveBtn.up').onclick=(e)=>{e.stopPropagation(); moveLayer(i, -1);};
       el.querySelector('.moveBtn.down').onclick=(e)=>{e.stopPropagation(); moveLayer(i, 1);};
       el.onclick=()=>{activeIdx=i; updateLayerUI(); syncLayerOp();};
       list.appendChild(el);
     });
-    updateAnimUI();
-    ensureLayerSize(); redrawComposite();
+    updateAnimUI(); ensureLayerSize(); redrawComposite();
   }
+
   function redrawComposite(){
     gComp.clearRect(0,0,cComp.width,cComp.height);
     for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
-
     if(currentTab==='draw' && toolType==='select' && selection.active){
       const nx = Math.min(selection.x, selection.x + selection.w);
       const ny = Math.min(selection.y, selection.y + selection.h);
       const nw = Math.abs(selection.w), nh = Math.abs(selection.h);
-      gComp.save();
-      gComp.globalAlpha = 1.0;
-      gComp.setLineDash([6,4]);
-      gComp.lineWidth = 2;
-      gComp.strokeStyle = 'rgba(0,0,0,0.85)';
-      gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
-      gComp.lineWidth = 1;
-      gComp.strokeStyle = 'rgba(0,208,255,0.95)';
-      gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      gComp.save(); gComp.globalAlpha = 1.0; gComp.setLineDash([6,4]); gComp.lineWidth = 2;
+      gComp.strokeStyle = 'rgba(0,0,0,0.85)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      gComp.lineWidth = 1; gComp.strokeStyle = 'rgba(0,208,255,0.95)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
       gComp.setLineDash([]);
-      if(selection.moving && selection.img){
-        gComp.globalAlpha = 0.85;
-        gComp.putImageData(selection.img, nx, ny);
-      }
+      if(selection.moving && selection.img){ gComp.globalAlpha = 0.85; gComp.putImageData(selection.img, nx, ny); }
       gComp.restore();
     }
   }
-  function ensureLayerSize(){
-    layers.forEach(L=>{
-      if(L.canvas.width!==cComp.width || L.canvas.height!==cComp.height){
-        const c=makeCanvas(cComp.width, cComp.height); 
-        const cx=c.getContext('2d', {willReadFrequently:true});
-        cx.drawImage(L.canvas,0,0); 
-        L.canvas=c; L.ctx=cx;
-      }
-    });
-  }
 
-  // Animation UI & Logic
-  const elAnimThumbs = document.getElementById('animThumbs');
-  const elAnimSeq = document.getElementById('animSeq');
-  const elAnimFps = document.getElementById('animFps');
-  const elAnimLoop = document.getElementById('animLoop');
-  const vAnimFps = document.getElementById('vAnimFps');
-  const vAnimLoop = document.getElementById('vAnimLoop');
+  function syncLayerOp(){ if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); } }
 
-  function getLayerById(id){ return layers.find(L=>L.id===id) || null; }
-
-  function layerThumbURL(L){
-    const tw=220, th=140;
-    const t=makeCanvas(tw, th);
-    const g=t.getContext('2d');
-    g.clearRect(0,0,tw,th);
-    const sw=L.canvas.width, sh=L.canvas.height;
-    if(sw>0 && sh>0){
-      const s = Math.min(tw/sw, th/sh);
-      const dw = Math.floor(sw*s), dh = Math.floor(sh*s);
-      const dx = Math.floor((tw-dw)/2), dy = Math.floor((th-dh)/2);
-      g.drawImage(L.canvas, 0,0,sw,sh, dx,dy,dw,dh);
-    }
-    return t.toDataURL('image/png');
-  }
-
-  function updateAnimUI(){
-    if(!elAnimThumbs || !elAnimSeq) return;
-    elAnimThumbs.innerHTML='';
-    layers.forEach((L)=>{
-      const item=document.createElement('div');
-      item.className='thumbItem';
-      const src = layerThumbURL(L);
-      item.innerHTML = `
-        <div class="thumbImg"><img draggable="false" src="${src}"></div>
-        <div class="thumbName">${L.name}</div>
-      `;
-      item.onclick=()=>{ animFrames.push(L.id); activeAnimIdx = animFrames.length-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-      elAnimThumbs.appendChild(item);
-    });
-
-    elAnimSeq.innerHTML='';
-    animFrames.forEach((layerId, idx)=>{
-      const L=getLayerById(layerId);
-      const item=document.createElement('div');
-      item.className = `seqItem ${idx===activeAnimIdx?'on':''}`;
-      item.draggable = true;
-      const src = L ? layerThumbURL(L) : '';
-      const label = L ? L.name : '(missing layer)';
-      item.innerHTML = `
-        <div class="seqThumb">${src?`<img draggable="false" src="${src}">`:''}</div>
-        <div class="seqLabel">${idx+1}. ${label}</div>
-        <div class="seqBtns">
-          <div class="seqBtn" data-act="dup">Copy</div>
-          <div class="seqBtn" data-act="del">Del</div>
-        </div>
-      `;
-      item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-      item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-      item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
-      item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
-      item.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-      item.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const from = Number(e.dataTransfer.getData('text/plain'));
-        const to = idx;
-        if(Number.isNaN(from) || from===to) return;
-        const [moved] = animFrames.splice(from,1);
-        animFrames.splice(to,0,moved);
-        activeAnimIdx = to;
-        updateAnimUI();
-        renderAnimFrame(activeAnimIdx);
-      });
-      elAnimSeq.appendChild(item);
-    });
-
-    if(elAnimFps && vAnimFps) vAnimFps.textContent = String(elAnimFps.value|0);
-    if(elAnimLoop && vAnimLoop) vAnimLoop.textContent = String(elAnimLoop.value|0);
-  }
-
-  function renderAnimFrame(idx){
-    if(currentTab!=='anim'){ return; }
-    if(animFrames.length===0){ redrawComposite(); return; }
-    if(idx<0 || idx>=animFrames.length) idx=0;
-    const L = getLayerById(animFrames[idx]);
-    if(!L){ redrawComposite(); return; }
-    gComp.clearRect(0,0,cComp.width,cComp.height);
-    gComp.globalAlpha = 1.0;
-    gComp.drawImage(L.canvas, 0,0);
-  }
-
-  function stopAnimPlayback(){
-    if(animTimer){ clearInterval(animTimer); animTimer=null; }
-    animPlaying=false;
-  }
-
-  function startAnimPlayback(){
-    if(currentTab!=='anim') return;
-    if(animFrames.length===0) return;
-    stopAnimPlayback();
-    animPlaying=true;
-    const fps = Math.max(1, Number(elAnimFps?.value||12));
-    const loop = Number(elAnimLoop?.value||0);
-    animLoopsRemaining = loop;
-    let i = activeAnimIdx||0;
-    const frameMs = Math.floor(1000 / fps);
-    animTimer = setInterval(()=>{
-      if(currentTab!=='anim'){ stopAnimPlayback(); return; }
-      renderAnimFrame(i);
-      i++;
-      if(i>=animFrames.length){
-        i=0;
-        if(loop>0){
-          animLoopsRemaining--;
-          if(animLoopsRemaining<=0){
-            stopAnimPlayback();
-            activeAnimIdx=0;
-            updateAnimUI();
-            renderAnimFrame(activeAnimIdx);
-            return;
-          }
-        }
-      }
-      activeAnimIdx = i;
-      updateAnimUI();
-    }, frameMs);
-  }
-
-const btnAnimPlay = document.getElementById('btnAnimPlay');
-  const btnAnimStop = document.getElementById('btnAnimStop');
-
-
-  btnAnimPlay && (btnAnimPlay.onpointerdown = (e)=>{ e.preventDefault(); startAnimPlayback(); });
-  btnAnimStop && (btnAnimStop.onpointerdown = (e)=>{ e.preventDefault(); stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
-  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); });
-  elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
-
-  function syncLayerOp(){
-    if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); }
-  }
-
-  let history = []; let historyStep = -1; const MAX_HISTORY = 20; let strokeStartData = null; 
   function recordHistory(oldData, newData, lIdx){
     if(historyStep < history.length - 1){ history = history.slice(0, historyStep + 1); }
     history.push({ layerIdx: lIdx, before: oldData, after: newData });
@@ -776,15 +601,12 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     updateUndoUI();
   }
   function performUndo(){
-    if(historyStep < 0) return;
-    const action = history[historyStep];
+    if(historyStep < 0) return; const action = history[historyStep];
     if(layers[action.layerIdx]){ layers[action.layerIdx].ctx.putImageData(action.before, 0, 0); redrawComposite(); }
     historyStep--; updateUndoUI();
   }
   function performRedo(){
-    if(historyStep >= history.length - 1) return;
-    historyStep++;
-    const action = history[historyStep];
+    if(historyStep >= history.length - 1) return; historyStep++; const action = history[historyStep];
     if(layers[action.layerIdx]){ layers[action.layerIdx].ctx.putImageData(action.after, 0, 0); redrawComposite(); }
     updateUndoUI();
   }
@@ -792,18 +614,26 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     document.getElementById('btnUndo').style.opacity = historyStep >= 0 ? '1' : '0.5';
     document.getElementById('btnRedo').style.opacity = historyStep < history.length - 1 ? '1' : '0.5';
   }
+
   document.getElementById('btnUndo').onclick = performUndo;
   document.getElementById('btnRedo').onclick = performRedo;
-  window.addEventListener('keydown', e => {
-    if((e.ctrlKey || e.metaKey) && e.key === 'z'){ e.preventDefault(); e.shiftKey ? performRedo() : performUndo(); }
-    if((e.ctrlKey || e.metaKey) && e.key === 'y'){ e.preventDefault(); performRedo(); }
-  });
+  document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
+  document.getElementById('btnDelLayer').onclick=()=>{if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}};
+  document.getElementById('btnDupLayer').onclick=()=>{
+    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); 
+    const cx=c.getContext('2d', {willReadFrequently:true}); cx.drawImage(src.canvas,0,0);
+    layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, opacity:src.opacity, canvas:c, ctx:cx}); updateLayerUI();
+  };
+  document.getElementById('btnClearActive').onclick=()=>{ 
+      const ctx = layers[activeIdx].ctx; const oldD = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+      ctx.clearRect(0,0,cComp.width,cComp.height); redrawComposite(); 
+      recordHistory(oldD, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx);
+  };
+  document.getElementById('layerOpacity').oninput=(e)=>{ if(layers[activeIdx]){ layers[activeIdx].opacity=+e.target.value; document.getElementById('vLayerOp').innerText=layers[activeIdx].opacity.toFixed(2); redrawComposite(); } };
 
-  let drawing=false, pts=[]; let toolType = 'pen';
-  const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
-
-  const shadowSettings = { flow:0.04, wet:0.82, grain:0.25, spacing:0.12, edgeDark: 0.55 };
-
+  // ==========================================
+  // 5. 描画 & 選択ロジック
+  // ==========================================
   function setTool(t){
     toolType=t;
     document.getElementById('toolPen').classList.toggle('active', t==='pen');
@@ -812,71 +642,36 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     document.getElementById('toolSelect').classList.toggle('active', t==='select');
     
     const panel = document.getElementById('slot-draw');
-    if(t === 'pen' || t === 'eraser') {
-        panel.classList.add('show-gpen'); panel.classList.remove('show-shadow');
-    } else if(t === 'shadow') {
-        panel.classList.remove('show-gpen'); panel.classList.add('show-shadow');
-    } else {
-        panel.classList.remove('show-gpen'); panel.classList.remove('show-shadow');
-    }
+    if(t === 'pen' || t === 'eraser') { panel.classList.add('show-gpen'); panel.classList.remove('show-shadow'); }
+    else if(t === 'shadow') { panel.classList.remove('show-gpen'); panel.classList.add('show-shadow'); }
+    else { panel.classList.remove('show-gpen'); panel.classList.remove('show-shadow'); }
     redrawComposite();
   }
-
   document.getElementById('toolPen').onclick=()=>setTool('pen');
   document.getElementById('toolShadow').onclick=()=>setTool('shadow');
   document.getElementById('toolEraser').onclick=()=>setTool('eraser');
   document.getElementById('toolSelect').onclick=()=>setTool('select');
 
-  const bindSet = (id, key, dispId, obj=penSettings) => {
-    document.getElementById(id).oninput=(e)=>{ obj[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = obj[key]; };
-  };
-  bindSet('penSize','size','vSize'); 
-  bindSet('penPress','press','vPress'); 
-  bindSet('penSmooth','smooth','vSmooth'); 
-  bindSet('penTaper','taper','vTaper');
-  
-  bindSet('shadowFlow', 'flow', 'vFlow', shadowSettings);
-  bindSet('shadowWet', 'wet', 'vWet', shadowSettings);
+  const bindSet = (id, key, dispId, obj=penSettings) => { document.getElementById(id).oninput=(e)=>{ obj[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = obj[key]; }; };
+  bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); 
+  bindSet('penSmooth','smooth','vSmooth'); bindSet('penTaper','taper','vTaper');
+  bindSet('shadowFlow', 'flow', 'vFlow', shadowSettings); bindSet('shadowWet', 'wet', 'vWet', shadowSettings);
 
-  // --- Watercolor Stamp Logic (FIXED HARD EDGE) ---
   let wcStampCache = new Map();
   function makeWatercolorStamp(size, wet=0.7, grain=0.35, edgeDark=0.85){
-    const s = Math.max(6, Math.floor(size));
-    const key = `${s}|${wet.toFixed(2)}|${grain.toFixed(2)}`;
+    const s = Math.max(6, Math.floor(size)); const key = `${s}|${wet.toFixed(2)}|${grain.toFixed(2)}`;
     if(wcStampCache.has(key)) return wcStampCache.get(key);
-
-    const c = document.createElement('canvas');
-    c.width = c.height = s*2;
-    const g = c.getContext('2d');
-    const cx = c.width/2, cy = c.height/2;
-    const r = s*(0.85 + wet*0.25);
-
+    const c = document.createElement('canvas'); c.width = c.height = s*2;
+    const g = c.getContext('2d'); const cx = c.width/2, cy = c.height/2; const r = s*(0.85 + wet*0.25);
     const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
-
-    grad.addColorStop(0.00, `rgba(0,0,0,0.02)`);
-
-    grad.addColorStop(0.85, `rgba(0,0,0,${0.08 + 0.15*edgeDark})`);
-
-    grad.addColorStop(1.00, `rgba(0,0,0,0)`);
-
-    g.fillStyle = grad;
-    g.beginPath();
-    g.arc(cx, cy, r, 0, Math.PI*2);
-    g.fill();
-
+    grad.addColorStop(0.00, `rgba(0,0,0,0.02)`); grad.addColorStop(0.85, `rgba(0,0,0,${0.08 + 0.15*edgeDark})`); grad.addColorStop(1.00, `rgba(0,0,0,0)`);
+    g.fillStyle = grad; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI*2); g.fill();
     if(grain > 0){
-        const img = g.getImageData(0,0,c.width,c.height);
-        const d = img.data;
-        for(let i=0;i<d.length;i+=4){
-            if(d[i+3]>0){ 
-                const n = (Math.random()*2-1) * 60 * grain; 
-                d[i+3] = Math.max(0, Math.min(255, d[i+3] + n));
-            }
-        }
+        const img = g.getImageData(0,0,c.width,c.height); const d = img.data;
+        for(let i=0;i<d.length;i+=4){ if(d[i+3]>0){ const n = (Math.random()*2-1) * 60 * grain; d[i+3] = Math.max(0, Math.min(255, d[i+3] + n)); } }
         g.putImageData(img,0,0);
     }
-    wcStampCache.set(key, c);
-    return c;
+    wcStampCache.set(key, c); return c;
   }
 
   function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
@@ -891,213 +686,119 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     return settings.size * pressFactor * Math.min(inT, outT);
   }
 
-  // ---- Selection (rect) tool ----
-  function normRect(x,y,w,h){
-    const nx = (w>=0)? x : x+w;
-    const ny = (h>=0)? y : y+h;
-    return { x: Math.max(0, Math.floor(nx)), y: Math.max(0, Math.floor(ny)), w: Math.max(0, Math.floor(Math.abs(w))), h: Math.max(0, Math.floor(Math.abs(h))) };
-  }
+  function normRect(x,y,w,h){ const nx = (w>=0)? x : x+w; const ny = (h>=0)? y : y+h; return { x: Math.max(0, Math.floor(nx)), y: Math.max(0, Math.floor(ny)), w: Math.max(0, Math.floor(Math.abs(w))), h: Math.max(0, Math.floor(Math.abs(h))) }; }
   function pointInRect(px,py,r){ return px>=r.x && py>=r.y && px<=(r.x+r.w) && py<=(r.y+r.h); }
 
   function beginSelect(e){
-    const p = evPos(e, cInput);
-    if(!layers[activeIdx]) return;
-    selection.dragging = true;  
-    cInput.setPointerCapture?.(e.pointerId); 
+    const p = evPos(e, cInput); if(!layers[activeIdx]) return;
+    selection.dragging = true;  try{ cInput.setPointerCapture(e.pointerId); }catch(_){} 
     const r = normRect(selection.x, selection.y, selection.w, selection.h);
     const inside = selection.active && selection.img && pointInRect(p.x, p.y, r);
     selection.startX = p.x; selection.startY = p.y;
     if(inside){
-      selection.moving = true;
-      selection.baseX = selection.x; selection.baseY = selection.y;
-      selection.origin = { x:r.x, y:r.y, w:r.w, h:r.h };
+      selection.moving = true; selection.baseX = selection.x; selection.baseY = selection.y; selection.origin = { x:r.x, y:r.y, w:r.w, h:r.h };
     }else{
-      selection.active = true;
-      selection.moving = false;
-      selection.img = null;
-      selection.origin = null;
+      selection.active = true; selection.moving = false; selection.img = null; selection.origin = null;
       selection.x = p.x; selection.y = p.y; selection.w = 0; selection.h = 0;
     }
     redrawComposite();
   }
 
   function moveSelect(e){
-    const p = evPos(e, cInput);
-    if(!selection.active) return;
-    if(!selection.dragging) return; 
+    const p = evPos(e, cInput); if(!selection.active || !selection.dragging) return; 
     if(selection.moving){
-      const dx = p.x - selection.startX;
-      const dy = p.y - selection.startY;
-      selection.x = selection.baseX + dx;
-      selection.y = selection.baseY + dy;
+      const dx = p.x - selection.startX; const dy = p.y - selection.startY;
+      selection.x = selection.baseX + dx; selection.y = selection.baseY + dy;
     }else{
-      selection.w = p.x - selection.startX;
-      selection.h = p.y - selection.startY;
+      selection.w = p.x - selection.startX; selection.h = p.y - selection.startY;
     }
     redrawComposite();
   }
 
   function endSelect(e){
-    if(!layers[activeIdx]) return;
-    const ctx = layers[activeIdx].ctx;
-    if(!selection.active) return;
-    selection.dragging = false;   
+    if(!layers[activeIdx] || !selection.active) return;
+    const ctx = layers[activeIdx].ctx; selection.dragging = false;   
     const r = normRect(selection.x, selection.y, selection.w, selection.h);
-
     if(!selection.moving){
-      if(r.w < 2 || r.h < 2){
-        selection.active = false; selection.img = null;
-        redrawComposite(); return;
-      }
+      if(r.w < 2 || r.h < 2){ selection.active = false; selection.img = null; redrawComposite(); return; }
       selection.x = r.x; selection.y = r.y; selection.w = r.w; selection.h = r.h;
       try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
       redrawComposite(); return;
     }
     selection.moving = false;
-    if(!selection.img){
-      try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
-    }
+    if(!selection.img){ try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; } }
     if(!selection.img){ redrawComposite(); return; }
     const before = snapshotLayer(activeIdx);
     const prev = selection.origin || normRect(selection.baseX, selection.baseY, selection.w, selection.h);
-    if(dragMode === 'move'){
-      ctx.clearRect(prev.x, prev.y, prev.w, prev.h);
-    }
+    if(dragMode === 'move'){ ctx.clearRect(prev.x, prev.y, prev.w, prev.h); }
     const nx = Math.max(0, Math.min(cComp.width - selection.img.width, Math.floor(selection.x)));
     const ny = Math.max(0, Math.min(cComp.height - selection.img.height, Math.floor(selection.y)));
     ctx.putImageData(selection.img, nx, ny);
-    const after = snapshotLayer(activeIdx);
-    recordHistory(before, after, activeIdx);
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
     selection.x = nx; selection.y = ny; selection.w = selection.img.width; selection.h = selection.img.height;
     selection.origin = { x:nx, y:ny, w:selection.img.width, h:selection.img.height };
     redrawComposite();
   }
 
-  window.addEventListener('keydown', e=>{
-    if(e.key === 'Escape'){
-      if(selection.active){
-        selection.active=false; selection.img=null; selection.moving=false; selection.origin=null;
-        redrawComposite();
-      }
-    }
-  });
-
-  // ---- Drawing / Input ----
   function evPos(e, canvas){
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width;
-    const sy = canvas.height / rect.height;
+    const rect = canvas.getBoundingClientRect(); const sx = canvas.width / rect.width; const sy = canvas.height / rect.height;
     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   }
 
   cInput.addEventListener('pointerdown', e=>{ 
     if(currentTab!=='draw') return;
-    const p = evPos(e, cInput);
-    lastPointer = {x:p.x, y:p.y};
-    if(toolType==='select'){ beginSelect(e); try{ cInput.setPointerCapture(e.pointerId); selectionPointerId = e.pointerId; }catch(_){ } return; }
+    if(isPinching || e.pointerType === 'touch') return; 
+    const p = evPos(e, cInput); lastPointer = {x:p.x, y:p.y};
+    if(toolType==='select'){ beginSelect(e); return; }
     if(!layers[activeIdx].visible) return; 
-    drawing=true; 
-    cInput.setPointerCapture(e.pointerId); 
+    drawing=true; try{cInput.setPointerCapture(e.pointerId);}catch(_){}
     pts=[{x:p.x, y:p.y, p:e.pressure||0.5}];
-    const ctx = layers[activeIdx].ctx; 
-    strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+    const ctx = layers[activeIdx].ctx; strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
   });
 
   cInput.addEventListener('pointermove', e=>{ 
     if(currentTab!=='draw') return;
-    const p = evPos(e, cInput);
-    lastPointer = {x:p.x, y:p.y};
+    if(isPinching || e.pointerType === 'touch') return; 
+    const p = evPos(e, cInput); lastPointer = {x:p.x, y:p.y};
     if(toolType==='select'){ moveSelect(e); return; }
     if(!drawing) return; const raw={x:p.x, y:p.y, p:e.pressure||0.5};
     const k = (toolType === 'shadow') ? 0.3 : (1.0 - penSettings.smooth);
-    const last = pts[pts.length-1];
-    pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
+    const last = pts[pts.length-1]; pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
     drawPreview(gInput, pts);
-  });
-
-  const endStroke = ()=>{
-    if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
-    
-    if(toolType === 'shadow'){
-        ctx.globalCompositeOperation = 'multiply';
-        drawStroke(ctx, pts);
-        ctx.globalCompositeOperation = 'source-over';
-    } else {
-        ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over';
-        drawStroke(ctx, pts); 
-        ctx.globalCompositeOperation = 'source-over';
-    }
-
-    gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
-    if(strokeStartData){ recordHistory(strokeStartData, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx); strokeStartData = null; }
-  };
-
-  cInput.addEventListener('pointerup', (e) => {
-    if (toolType === 'select') {
-      if (typeof endSelect === 'function') { endSelect(e); } 
-      try { cInput.releasePointerCapture(e.pointerId); } catch (_) {}
-      return;
-    }
-    if(typeof endStroke === 'function') endStroke();
   });
 
   function drawStroke(ctx, points){
     if(points.length<2) return; 
-    
-    // === WATERCOLOR SHADOW BRANCH ===
     if(toolType === 'shadow'){
         const stampSize = penSettings.size * 2; 
         const stamp = makeWatercolorStamp(stampSize, shadowSettings.wet, shadowSettings.grain, shadowSettings.edgeDark);
-        
-        const baseSpacing = shadowSettings.spacing; 
-        const flow = shadowSettings.flow;
-        
-        ctx.save();
-        ctx.globalAlpha = flow; 
-        
+        const baseSpacing = shadowSettings.spacing; const flow = shadowSettings.flow;
+        ctx.save(); ctx.globalAlpha = flow; 
         for(let i=1; i<points.length; i++){
             const p0 = points[i-1], p1 = points[i];
-            const dx=p1.x-p0.x, dy=p1.y-p0.y;
-            const distVal = Math.hypot(dx,dy);
+            const dx=p1.x-p0.x, dy=p1.y-p0.y; const distVal = Math.hypot(dx,dy);
             if(distVal < 0.5) continue; 
-
             const speedFactor = Math.min(1.0, 12 / Math.max(1, distVal)); 
             const dynamicSpacing = baseSpacing * (0.6 + 0.4 * speedFactor);
-
-            const stepPx = Math.max(1, stamp.width * dynamicSpacing);
-            const n = Math.ceil(distVal / stepPx);
-            
+            const stepPx = Math.max(1, stamp.width * dynamicSpacing); const n = Math.ceil(distVal / stepPx);
             for(let j=0; j<n; j++){
-                const t = j/n;
-                const x = p0.x + dx*t;
-                const y = p0.y + dy*t;
-                
-                const jx = (Math.random()*2-1)*0.2; // 0.5 -> 0.2
-                const jy = (Math.random()*2-1)*0.2;
-                
-                const press = lerp(p0.p, p1.p, t);
-                const currentScale = 0.5 + 0.5*press; 
-                const dw = stamp.width * currentScale;
-                const dh = stamp.height * currentScale;
-                
+                const t = j/n; const x = p0.x + dx*t; const y = p0.y + dy*t;
+                const jx = (Math.random()*2-1)*0.2; const jy = (Math.random()*2-1)*0.2;
+                const press = lerp(p0.p, p1.p, t); const currentScale = 0.5 + 0.5*press; 
+                const dw = stamp.width * currentScale; const dh = stamp.height * currentScale;
                 ctx.drawImage(stamp, x - dw/2 + jx, y - dh/2 + jy, dw, dh);
             }
         }
-        ctx.restore();
-        return;
+        ctx.restore(); return;
     }
 
-    // === STANDARD GPEN BRANCH ===
     const {lens, total} = getStrokeLengths(points);
     const strength = (toolType === 'eraser') ? 2.4 : 1.0;
     ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
     if(toolType === 'eraser'){
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
+        ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
         for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-        ctx.lineWidth = penSettings.size;
-        ctx.stroke();
-        return;
+        ctx.lineWidth = penSettings.size; ctx.stroke(); return;
     }
     for(let i=1; i<points.length; i++){
       const t0 = lens[i-1]/total, t1 = lens[i]/total;
@@ -1115,7 +816,6 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
       ctx.moveTo(points[0].x, points[0].y); for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.lineWidth = penSettings.size; ctx.stroke();
     } else if(toolType === 'shadow'){
-
       ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = penSettings.size; 
       ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
       for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
@@ -1125,171 +825,229 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     }
   }
 
-  document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
-  document.getElementById('btnDelLayer').onclick=()=>{if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}};
-  document.getElementById('btnDupLayer').onclick=()=>{
-    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); 
-    const cx=c.getContext('2d', {willReadFrequently:true});
-    cx.drawImage(src.canvas,0,0);
-    layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, opacity:src.opacity, canvas:c, ctx:cx});
-    updateLayerUI();
+  const endStroke = ()=>{
+    if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
+    if(toolType === 'shadow'){
+        ctx.globalCompositeOperation = 'multiply'; drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    } else {
+        ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over'; drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    }
+    gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
+    if(strokeStartData){ recordHistory(strokeStartData, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx); strokeStartData = null; }
   };
-  document.getElementById('btnClearActive').onclick=()=>{ 
-      const ctx = layers[activeIdx].ctx; const oldD = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
-      ctx.clearRect(0,0,cComp.width,cComp.height); redrawComposite(); 
-      recordHistory(oldD, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx);
-  };
-  document.getElementById('layerOpacity').oninput=(e)=>{ if(layers[activeIdx]){ layers[activeIdx].opacity=+e.target.value; document.getElementById('vLayerOp').innerText=layers[activeIdx].opacity.toFixed(2); redrawComposite(); } };
-  document.getElementById('btnExportPNG').onclick=()=>{
-    const c=makeCanvas(cComp.width,cComp.height), x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
-    for(let i=layers.length-1;i>=0;i--){ if(layers[i].visible) x.drawImage(layers[i].canvas,0,0); }
-    const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
-  };
-  
-  // (Clipboard functions remain same)
-  let __clipboard = null; 
+
+  cInput.addEventListener('pointerup', (e) => {
+    if (toolType === 'select') {
+      endSelect(e); 
+      try { cInput.releasePointerCapture(e.pointerId); } catch (_) {}
+      return;
+    }
+    endStroke();
+  });
+
+  // ==========================================
+  // 6. クリップボード & コントロールUI
+  // ==========================================
   function snapshotLayer(idx){
-    if(!layers[idx]) return null;
-    const ctx = layers[idx].ctx;
-    return ctx.getImageData(0,0,cComp.width,cComp.height);
+    if(!layers[idx]) return null; const ctx = layers[idx].ctx; return ctx.getImageData(0,0,cComp.width,cComp.height);
   }
   function doCopy(){
     if(!layers[activeIdx]) return;
-    const ctx = layers[activeIdx].ctx;
-    if(selection.active && selection.img){
-      __clipboard = { kind:'rect', w: selection.img.width, h: selection.img.height, data: selection.img };
-    }else{
-      const img = snapshotLayer(activeIdx);
-      __clipboard = { kind:'full', w: img.width, h: img.height, data: img };
-    }
+    if(selection.active && selection.img){ __clipboard = { kind:'rect', w: selection.img.width, h: selection.img.height, data: selection.img };
+    }else{ const img = snapshotLayer(activeIdx); __clipboard = { kind:'full', w: img.width, h: img.height, data: img }; }
   }
   function doCut(){
-    if(!layers[activeIdx]) return;
-    const ctx = layers[activeIdx].ctx;
-    const before = snapshotLayer(activeIdx);
+    if(!layers[activeIdx]) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
     if(selection.active && selection.img){
       const r = normRect(selection.x, selection.y, selection.w, selection.h);
-      try{
-        const img = ctx.getImageData(r.x, r.y, r.w, r.h);
-        __clipboard = { kind:'rect', w: img.width, h: img.height, data: img };
-        ctx.clearRect(r.x, r.y, r.w, r.h);
-      }catch(_){}
+      try{ const img = ctx.getImageData(r.x, r.y, r.w, r.h); __clipboard = { kind:'rect', w: img.width, h: img.height, data: img }; ctx.clearRect(r.x, r.y, r.w, r.h); }catch(_){}
     }else{
-      const img = before;
-      __clipboard = { kind:'full', w: img.width, h: img.height, data: img };
-      ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
+      const img = before; __clipboard = { kind:'full', w: img.width, h: img.height, data: img }; ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
     }
-    const after = snapshotLayer(activeIdx);
-    recordHistory(before, after, activeIdx);
-    redrawComposite();
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
   }
   function doPaste(){
-    if(!__clipboard || !layers[activeIdx]) return;
-    const ctx = layers[activeIdx].ctx;
-    const before = snapshotLayer(activeIdx);
+    if(!__clipboard || !layers[activeIdx]) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
     if(__clipboard.kind === 'rect'){
       const px = (selection.active) ? Math.floor(selection.x) : Math.floor(lastPointer.x || 0);
       const py = (selection.active) ? Math.floor(selection.y) : Math.floor(lastPointer.y || 0);
-      const nx = Math.max(0, Math.min(ctx.canvas.width - __clipboard.w, px));
-      const ny = Math.max(0, Math.min(ctx.canvas.height - __clipboard.h, py));
+      const nx = Math.max(0, Math.min(ctx.canvas.width - __clipboard.w, px)); const ny = Math.max(0, Math.min(ctx.canvas.height - __clipboard.h, py));
       ctx.putImageData(__clipboard.data, nx, ny);
       selection.active = true; selection.moving = false; selection.x = nx; selection.y = ny; selection.w = __clipboard.w; selection.h = __clipboard.h;
       try{ selection.img = ctx.getImageData(nx, ny, __clipboard.w, __clipboard.h); }catch(_){ selection.img=null; }
-    }else{
-      ctx.putImageData(__clipboard.data, 0, 0);
-      selection.active = false; selection.img = null; selection.moving = false;
-    }
-    const after = snapshotLayer(activeIdx);
-    recordHistory(before, after, activeIdx);
-    redrawComposite();
+    }else{ ctx.putImageData(__clipboard.data, 0, 0); selection.active = false; selection.img = null; selection.moving = false; }
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
   }
   document.getElementById('btnCopy').onclick = doCopy;
   document.getElementById('btnCut').onclick = doCut;
   document.getElementById('btnDelete').onclick = ()=>{
-    if(!layers[activeIdx]) return;
-    const ctx = layers[activeIdx].ctx;
-    const before = snapshotLayer(activeIdx);
+    if(!layers[activeIdx]) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
     if(selection.active && selection.img){
-      const r = normRect(selection.x, selection.y, selection.w, selection.h);
-      ctx.clearRect(r.x, r.y, r.w, r.h);
+      const r = normRect(selection.x, selection.y, selection.w, selection.h); ctx.clearRect(r.x, r.y, r.w, r.h);
       selection.active = false; selection.img=null; selection.moving=false; selection.origin=null;
-    }else{
-      ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
-    }
-    const after = snapshotLayer(activeIdx);
-    recordHistory(before, after, activeIdx);
-    redrawComposite();
+    }else{ ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height); }
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
   };
   document.getElementById('btnPaste').onclick = doPaste;
 
-  // Drag mode toggle
-  const elDragMove = document.getElementById('dragModeMove');
-  const elDragCopy = document.getElementById('dragModeCopy');
-  function syncDragModeUI(){
-    if(!elDragMove || !elDragCopy) return;
-    elDragMove.classList.toggle('active', dragMode==='move');
-    elDragCopy.classList.toggle('active', dragMode==='copy');
-  }
+  const elDragMove = document.getElementById('dragModeMove'); const elDragCopy = document.getElementById('dragModeCopy');
+  function syncDragModeUI(){ if(!elDragMove || !elDragCopy) return; elDragMove.classList.toggle('active', dragMode==='move'); elDragCopy.classList.toggle('active', dragMode==='copy'); }
   if(elDragMove) elDragMove.onclick = ()=>{ dragMode='move'; syncDragModeUI(); };
   if(elDragCopy) elDragCopy.onclick = ()=>{ dragMode='copy'; syncDragModeUI(); };
   syncDragModeUI();
 
   window.addEventListener('keydown', e => {
-    const mod = e.ctrlKey || e.metaKey;
-    if(!mod) return;
+    const mod = e.ctrlKey || e.metaKey; if(!mod){
+        if(e.key === 'Escape'){ if(selection.active){ selection.active=false; selection.img=null; selection.moving=false; selection.origin=null; redrawComposite(); } }
+        return;
+    } 
     const k = (e.key || '').toLowerCase();
-    if(k === 'c'){ e.preventDefault(); doCopy(); }
-    if(k === 'x'){ e.preventDefault(); doCut(); }
-    if(k === 'v'){ e.preventDefault(); doPaste(); }
+    if(k === 'c'){ e.preventDefault(); doCopy(); } if(k === 'x'){ e.preventDefault(); doCut(); } if(k === 'v'){ e.preventDefault(); doPaste(); }
   });
+
+  const refImage = document.getElementById('refImage'); const uiToggle = document.getElementById('traceToggle') || document.getElementById('refToggle');
+  const uiYaw = document.getElementById('traceYaw'); const uiPitch = document.getElementById('tracePitch'); const uiOp = document.getElementById('refOp');
+  const CELL_W = 300, CELL_H = 300, START_CX = 150, START_CY = 150, CONTAINER_CW = 150, CONTAINER_CH = 150;
+  const LABEL_YAW = { "-2":"-90", "-1":"-45", "0":"0", "1":"45", "2":"90" }; const LABEL_PITCH = { "2":"30", "1":"15", "0":"0", "-1":"-15", "-2":"-30" };
+  function updateMatrixView(){
+    if(uiToggle && !uiToggle.checked){ if(refContainer) refContainer.style.display = 'none'; return; }
+    if(refContainer) refContainer.style.display = 'block';
+    const yawVal = parseInt(uiYaw.value); const pitchVal = parseInt(uiPitch.value); const zoomVal = 1.5; const opVal = parseFloat(uiOp.value);
+    const elYaw = document.getElementById('vYaw'), elPitch = document.getElementById('vPitch'); const elOp = document.getElementById('vRefOp');
+    if(elYaw) elYaw.innerText = (LABEL_YAW[yawVal] || yawVal) + "°"; if(elPitch) elPitch.innerText = (LABEL_PITCH[pitchVal] || pitchVal) + "°"; if(elOp) elOp.innerText = opVal.toFixed(2);
+    if(refContainer){ refContainer.style.opacity = opVal; refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`; refContainer.style.width = `${CELL_W}px`; refContainer.style.height = `${CELL_H}px`; }
+    const col = yawVal + 2; const row = 2 - pitchVal; const cx = START_CX + col * CELL_W; const cy = START_CY + row * CELL_H;
+    const targetX = CONTAINER_CW - cx; const targetY = CONTAINER_CH - cy;
+    if(refImage){ refImage.style.transform = `translate(${targetX}px, ${targetY}px)`; }
+  }
+  const controls = [uiToggle, uiYaw, uiPitch, uiOp]; controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
+
+  // ==========================================
+  // 7. アニメーション & エクスポート ロジック
+  // ==========================================
+  const elAnimThumbs = document.getElementById('animThumbs');
+  const elAnimSeq = document.getElementById('animSeq');
+  const elAnimFps = document.getElementById('animFps');
+  const elAnimLoop = document.getElementById('animLoop');
+  const vAnimFps = document.getElementById('vAnimFps');
+  const vAnimLoop = document.getElementById('vAnimLoop');
+
+  function getLayerById(id){ return layers.find(L=>L.id===id) || null; }
+  function layerThumbURL(L){
+    const tw=220, th=140; const t=makeCanvas(tw, th); const g=t.getContext('2d');
+    g.clearRect(0,0,tw,th); const sw=L.canvas.width, sh=L.canvas.height;
+    if(sw>0 && sh>0){
+      const s = Math.min(tw/sw, th/sh); const dw = Math.floor(sw*s), dh = Math.floor(sh*s);
+      const dx = Math.floor((tw-dw)/2), dy = Math.floor((th-dh)/2);
+      g.drawImage(L.canvas, 0,0,sw,sh, dx,dy,dw,dh);
+    }
+    return t.toDataURL('image/png');
+  }
+
+  function updateAnimUI(){
+    if(!elAnimThumbs || !elAnimSeq) return;
+    elAnimThumbs.innerHTML='';
+    layers.forEach((L)=>{
+      const item=document.createElement('div'); item.className='thumbItem'; const src = layerThumbURL(L);
+      item.innerHTML = `<div class="thumbImg"><img draggable="false" src="${src}"></div><div class="thumbName">${L.name}</div>`;
+      item.onclick=()=>{ animFrames.push(L.id); activeAnimIdx = animFrames.length-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      elAnimThumbs.appendChild(item);
+    });
+
+    elAnimSeq.innerHTML='';
+    animFrames.forEach((layerId, idx)=>{
+      const L=getLayerById(layerId); const item=document.createElement('div');
+      item.className = `seqItem ${idx===activeAnimIdx?'on':''}`; item.draggable = true;
+      const src = L ? layerThumbURL(L) : ''; const label = L ? L.name : '(missing layer)';
+      item.innerHTML = `
+        <div class="seqThumb">${src?`<img draggable="false" src="${src}">`:''}</div>
+        <div class="seqLabel">${idx+1}. ${label}</div>
+        <div class="seqBtns"><div class="seqBtn" data-act="dup">Copy</div><div class="seqBtn" data-act="del">Del</div></div>
+      `;
+      item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
+      item.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+      item.addEventListener('drop', (e)=>{
+        e.preventDefault(); const from = Number(e.dataTransfer.getData('text/plain')); const to = idx;
+        if(Number.isNaN(from) || from===to) return;
+        const [moved] = animFrames.splice(from,1); animFrames.splice(to,0,moved);
+        activeAnimIdx = to; updateAnimUI(); renderAnimFrame(activeAnimIdx);
+      });
+      elAnimSeq.appendChild(item);
+    });
+
+    if(elAnimFps && vAnimFps) vAnimFps.textContent = String(elAnimFps.value|0);
+    if(elAnimLoop && vAnimLoop) vAnimLoop.textContent = String(elAnimLoop.value|0);
+  }
+
+  function renderAnimFrame(idx){
+    if(currentTab!=='anim'){ return; }
+    if(animFrames.length===0){ redrawComposite(); return; }
+    if(idx<0 || idx>=animFrames.length) idx=0;
+    const L = getLayerById(animFrames[idx]);
+    if(!L){ redrawComposite(); return; }
+    gComp.clearRect(0,0,cComp.width,cComp.height); gComp.globalAlpha = 1.0; gComp.drawImage(L.canvas, 0,0);
+  }
+
+  function stopAnimPlayback(){ if(animTimer){ clearInterval(animTimer); animTimer=null; } animPlaying=false; }
+  function startAnimPlayback(){
+    if(currentTab!=='anim') return; if(animFrames.length===0) return;
+    stopAnimPlayback(); animPlaying=true;
+    const fps = Math.max(1, Number(elAnimFps?.value||12)); const loop = Number(elAnimLoop?.value||0);
+    animLoopsRemaining = loop; let i = activeAnimIdx||0; const frameMs = Math.floor(1000 / fps);
+    animTimer = setInterval(()=>{
+      if(currentTab!=='anim'){ stopAnimPlayback(); return; }
+      renderAnimFrame(i); i++;
+      if(i>=animFrames.length){
+        i=0;
+        if(loop>0){
+          animLoopsRemaining--;
+          if(animLoopsRemaining<=0){ stopAnimPlayback(); activeAnimIdx=0; updateAnimUI(); renderAnimFrame(activeAnimIdx); return; }
+        }
+      }
+      activeAnimIdx = i; updateAnimUI();
+    }, frameMs);
+  }
+
+  const btnAnimPlay = document.getElementById('btnAnimPlay'); const btnAnimStop = document.getElementById('btnAnimStop');
+  btnAnimPlay && (btnAnimPlay.onpointerdown = (e)=>{ e.preventDefault(); startAnimPlayback(); });
+  btnAnimStop && (btnAnimStop.onpointerdown = (e)=>{ e.preventDefault(); stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
+  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); }); elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
 
   function downloadBlob(filename, blob){
     const a=document.createElement('a'); a.download=filename; a.href=URL.createObjectURL(blob);
     document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 30000);
   }
+
+  document.getElementById('btnExportPNG').onclick=()=>{
+    const c=makeCanvas(cComp.width,cComp.height), x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+    for(let i=layers.length-1;i>=0;i--){ if(layers[i].visible) x.drawImage(layers[i].canvas,0,0); }
+    const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
+  };
+
   function buildAnimxProject(){
-    const traceEnabled = uiToggle?.checked ?? true;
-    const yaw = Number(uiYaw?.value ?? 0); const pitch = Number(uiPitch?.value ?? 0);
-    const zoom = 1.5; const op = Number(uiOp?.value ?? 0.35);
-    const fps = Number(document.getElementById('animFps')?.value ?? 12);
+    const traceEnabled = uiToggle?.checked ?? true; const yaw = Number(uiYaw?.value ?? 0); const pitch = Number(uiPitch?.value ?? 0);
+    const zoom = 1.5; const op = Number(uiOp?.value ?? 0.35); const fps = Number(document.getElementById('animFps')?.value ?? 12);
     const loop = Number(document.getElementById('animLoop')?.value ?? 0);
     const layerPayload = layers.map(l => ({ id: l.id, name: l.name, visible: !!l.visible, opacity: Number(l.opacity ?? 1), png: l.canvas.toDataURL('image/png') }));
     return {
       magic: "ANIMX_PROJECT", schema_version: 1, created_at: new Date().toISOString(),
-      canvas: { w: baseW, h: baseH },
-      trace: { enabled: traceEnabled, yaw, pitch, zoom, opacity: op },
-      layers: layerPayload,
-      anim: { fps, loop, frames: [...animFrames] },
+      canvas: { w: baseW, h: baseH }, trace: { enabled: traceEnabled, yaw, pitch, zoom, opacity: op },
+      layers: layerPayload, anim: { fps, loop, frames: [...animFrames] },
       ui: { active_layer_id: layers[activeIdx]?.id ?? null, active_frame_index: activeAnimIdx }
     };
   }
-document.getElementById('btnExportANIMX').onclick = () => {
-    // 1. 保存するファイル名を入力してもらう
-    let filename = prompt("Enter project name:", "my_project");
-
-    // キャンセルされた場合は処理を中断
-    if (filename === null) return;
-
-    // 空入力の場合はデフォルト名にする
-    if (filename.trim() === "") {
-      filename = "project_" + new Date().getTime();
-    }
-
-    // 2. 拡張子 .animx が付いていなければ自動で付ける
-    if (!filename.endsWith('.animx')) {
-      filename += '.animx';
-    }
-
-    // 3. プロジェクトデータの書き出し（Safari対策込み）
-    const proj = buildAnimxProject(); 
-    const text = JSON.stringify(proj);
-    const blob = new Blob([text], {type: 'application/octet-stream'}); 
-
+  document.getElementById('btnExportANIMX').onclick = () => {
+    let filename = prompt("Enter project name:", "my_project"); if (filename === null) return;
+    if (filename.trim() === "") filename = "project_" + new Date().getTime();
+    if (!filename.endsWith('.animx')) filename += '.animx';
+    const proj = buildAnimxProject(); const text = JSON.stringify(proj); const blob = new Blob([text], {type: 'application/octet-stream'}); 
     downloadBlob(filename, blob);
   };
 
-  const fileImportAnimx = document.getElementById('fileImportAnimx');
-  const btnImportANIMX = document.getElementById('btnImportANIMX');
+  const fileImportAnimx = document.getElementById('fileImportAnimx'); const btnImportANIMX = document.getElementById('btnImportANIMX');
   function isValidAnimxProject(obj){ return obj && obj.magic === 'ANIMX_PROJECT'; }
   function loadImage(dataUrl){ return new Promise((resolve, reject)=>{ const img = new Image(); img.onload = ()=>resolve(img); img.onerror = ()=>reject(new Error('fail')); img.src = dataUrl; }); }
   async function applyAnimxProject(proj){
@@ -1304,14 +1062,9 @@ document.getElementById('btnExportANIMX').onclick = () => {
       try{ const img = await loadImage(L.png); ctx.drawImage(img, 0,0, c.width, c.height); }catch(_){ }
       layers.push({ id: String(L.id || `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`), name: String(L.name || 'Layer'), visible: !!L.visible, opacity: Number(L.opacity)||1, canvas: c, ctx });
     }
-    const wanted = proj.ui?.active_layer_id || null;
-    activeIdx = Math.max(0, layers.findIndex(x=>x.id===wanted));
-    if(proj.trace){
-      uiToggle.checked = !!proj.trace.enabled; uiYaw.value = String(Number(proj.trace.yaw ?? 0));
-      uiPitch.value = String(Number(proj.trace.pitch ?? 0)); uiOp.value = String(Number(proj.trace.opacity ?? 0.5));
-    }
-    updateMatrixView();
-    animFrames = Array.isArray(proj.anim?.frames) ? proj.anim.frames.map(String) : [];
+    const wanted = proj.ui?.active_layer_id || null; activeIdx = Math.max(0, layers.findIndex(x=>x.id===wanted));
+    if(proj.trace){ uiToggle.checked = !!proj.trace.enabled; uiYaw.value = String(Number(proj.trace.yaw ?? 0)); uiPitch.value = String(Number(proj.trace.pitch ?? 0)); uiOp.value = String(Number(proj.trace.opacity ?? 0.5)); }
+    updateMatrixView(); animFrames = Array.isArray(proj.anim?.frames) ? proj.anim.frames.map(String) : [];
     activeAnimIdx = Math.max(0, Math.min(Number(proj.ui?.active_frame_index ?? 0), Math.max(0, animFrames.length-1)));
     updateLayerUI(); setTab('draw');
   }
@@ -1321,95 +1074,16 @@ document.getElementById('btnExportANIMX').onclick = () => {
     try{ const text = await f.text(); await applyAnimxProject(JSON.parse(text)); }catch(e){ alert('Import failed'); }finally{ fileImportAnimx.value = ''; }
   });
 
-
-
-// ---- iPad/Touch Navigation Logic ----
-  let initialPinchDist = null;
-  let initialScale = 1.0;
-
-  // 1. 指とペンの使い分け
-  cInput.addEventListener('pointerdown', e => { 
-    if (currentTab !== 'draw') return;
-
-    // iPad/iPhoneで「指」の場合は描画を開始しない（ネイティブスクロールに任せる）
-    if (e.pointerType === 'touch' && toolType !== 'select') {
-      return; 
-    }
-
-    const p = evPos(e, cInput);
-    lastPointer = {x: p.x, y: p.y};
-    
-    if (toolType === 'select') { beginSelect(e); return; }
-    if (!layers[activeIdx].visible) return; 
-
-    drawing = true; 
-    cInput.setPointerCapture(e.pointerId); 
-    pts = [{x: p.x, y: p.y, p: e.pressure || 0.5}];
-    const ctx = layers[activeIdx].ctx; 
-    strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
-  });
-
-  // 2. ピンチズーム（二本指での拡大縮小）のサポート
-  stageContainer.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-      initialPinchDist = d;
-      initialScale = currentScale;
-    }
-  }, { passive: true });
-
-  stageContainer.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && initialPinchDist) {
-      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-      const ratio = d / initialPinchDist;
-      let nextScale = initialScale * ratio;
-      nextScale = Math.max(0.1, Math.min(4, nextScale));
-      
-      const rect = stageContainer.getBoundingClientRect();
-      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-      
-      zoomToPoint(nextScale, centerX, centerY);
-      
-      // スライダーの値も同期させる
-      elZoom.value = Math.round(nextScale * 100);
-      vZoom.innerText = elZoom.value + '%';
-    }
-  }, { passive: true });
-
-  stageContainer.addEventListener('touchend', () => {
-    initialPinchDist = null;
-  });
-
-// スライダーでのズーム：画面中央を起点にする
-  elZoom.oninput = (e) => {
-    const nextScale = +e.target.value / 100;
-    vZoom.innerText = +e.target.value + '%';
-    
-    const rect = stageContainer.getBoundingClientRect();
-    // 画面の真ん中の座標
-    const midX = rect.width / 2;
-    const midY = rect.height / 2;
-    
-    zoomToPoint(nextScale, midX, midY);
-  };
-
-// ---- WebP Export Functions (Missing Logic) ----
-  function u32le(v){ return [v&255,(v>>8)&255,(v>>16)&255,(v>>24)&255]; }
-  function u16le(v){ return [v&255,(v>>8)&255]; }
-  function u24le(v){ return [v&255,(v>>8)&255,(v>>16)&255]; }
+  function u32le(v){ return [v&255,(v>>8)&255,(v>>16)&255,(v>>24)&255]; } function u16le(v){ return [v&255,(v>>8)&255]; } function u24le(v){ return [v&255,(v>>8)&255,(v>>16)&255]; }
   function str4(s){ return [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)]; }
   function readU32LE(d, o){ return (d[o]) | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24); }
 
   function parseWebPImageChunks(arrayBuffer){
-    const d = new Uint8Array(arrayBuffer);
-    if(String.fromCharCode(...d.slice(0,4)) !== 'RIFF' || String.fromCharCode(...d.slice(8,12)) !== 'WEBP'){ throw new Error('Not a WebP RIFF'); }
+    const d = new Uint8Array(arrayBuffer); if(String.fromCharCode(...d.slice(0,4)) !== 'RIFF' || String.fromCharCode(...d.slice(8,12)) !== 'WEBP'){ throw new Error('Not a WebP RIFF'); }
     let off = 12; const chunks = [];
     while(off + 8 <= d.length){
-      const tag = String.fromCharCode(...d.slice(off, off+4));
-      const size = readU32LE(d, off+4);
-      const dataStart = off + 8; const dataEnd = dataStart + size;
-      if(dataEnd > d.length) break;
+      const tag = String.fromCharCode(...d.slice(off, off+4)); const size = readU32LE(d, off+4);
+      const dataStart = off + 8; const dataEnd = dataStart + size; if(dataEnd > d.length) break;
       if(tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH'){ chunks.push({tag, data: d.slice(dataStart, dataEnd)}); }
       off = dataEnd + (size % 2); 
     }
@@ -1417,354 +1091,90 @@ document.getElementById('btnExportANIMX').onclick = () => {
   }
 
   function makeChunk(tag, dataBytes){
-    const size = dataBytes.length; const pad = size % 2;
-    const out = new Uint8Array(8 + size + pad);
-    out.set(str4(tag), 0); out.set(u32le(size), 4); out.set(dataBytes, 8);
-    return out;
+    const size = dataBytes.length; const pad = size % 2; const out = new Uint8Array(8 + size + pad);
+    out.set(str4(tag), 0); out.set(u32le(size), 4); out.set(dataBytes, 8); return out;
   }
 
   function buildAnimatedWebP({width, height, loopCount, frames}){
-    let hasAlpha = false;
-    for(const f of frames){
-      for(const c of f.chunks){ if(c.tag === 'ALPH' || c.tag === 'VP8L'){ hasAlpha = true; break; } }
-      if(hasAlpha) break;
-    }
-    const flags = (1<<1) | (hasAlpha ? (1<<4) : 0);
-    const vp8xPayload = new Uint8Array([ flags, 0,0,0, ...u24le(width-1), ...u24le(height-1) ]);
-    const chunksOut = [makeChunk('VP8X', vp8xPayload)];
-    const animPayload = new Uint8Array([ 0,0,0,0, ...u16le(loopCount) ]);
-    chunksOut.push(makeChunk('ANIM', animPayload));
+    let hasAlpha = false; for(const f of frames){ for(const c of f.chunks){ if(c.tag === 'ALPH' || c.tag === 'VP8L'){ hasAlpha = true; break; } } if(hasAlpha) break; }
+    const flags = (1<<1) | (hasAlpha ? (1<<4) : 0); const vp8xPayload = new Uint8Array([ flags, 0,0,0, ...u24le(width-1), ...u24le(height-1) ]);
+    const chunksOut = [makeChunk('VP8X', vp8xPayload)]; const animPayload = new Uint8Array([ 0,0,0,0, ...u16le(loopCount) ]); chunksOut.push(makeChunk('ANIM', animPayload));
     for(const f of frames){
       const duration = Math.max(1, Math.min(0xFFFFFF, f.durationMs|0));
       const frameHdr = new Uint8Array([ ...u24le(0), ...u24le(0), ...u24le(width-1), ...u24le(height-1), ...u24le(duration), 0x00 ]);
-      let payloadParts = [frameHdr];
-      for(const c of f.chunks){ payloadParts.push(makeChunk(c.tag, c.data)); }
-      const total = payloadParts.reduce((s,a)=>s+a.length, 0);
-      const payload = new Uint8Array(total);
+      let payloadParts = [frameHdr]; for(const c of f.chunks){ payloadParts.push(makeChunk(c.tag, c.data)); }
+      const total = payloadParts.reduce((s,a)=>s+a.length, 0); const payload = new Uint8Array(total);
       let o=0; for(const part of payloadParts){ payload.set(part, o); o += part.length; }
       chunksOut.push(makeChunk('ANMF', payload));
     }
-    const riffSize = 4 + chunksOut.reduce((s,c)=>s+c.length,0);
-    const out = new Uint8Array(8 + riffSize);
+    const riffSize = 4 + chunksOut.reduce((s,c)=>s+c.length,0); const out = new Uint8Array(8 + riffSize);
     out.set(str4('RIFF'),0); out.set(u32le(riffSize),4); out.set(str4('WEBP'),8);
-    let o=12; for(const c of chunksOut){ out.set(c,o); o+=c.length; }
-    return out;
+    let o=12; for(const c of chunksOut){ out.set(c,o); o+=c.length; } return out;
   }
-
-// プロジェクト全体の保存
-async function saveProjectAsAnimX() {
-    const projectData = {
-        version: "1.0",
-        fps: parseInt(elFps.value),
-        // 全レイヤーの画像をDataURLとして保存
-        layers: layers.map(l => ({
-            name: l.name,
-            visible: l.visible,
-            data: l.ctx.canvas.toDataURL("image/png")
-        })),
-        // アニメーションの再生順序
-        sequence: animSequence.map(s => ({
-            layerId: s.layerId,
-            duration: s.duration
-        }))
-    };
-
-    const json = JSON.stringify(projectData);
-    const blob = new Blob([json], { type: 'application/octet-stream' }); // Safari対策
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `project_${new Date().getTime()}.animx`;
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-}
-
-// ファイル選択ダイアログを開いて読み込む
-function importAnimXProject(file) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            
-            // 1. 既存のレイヤーとシーケンスをクリア
-            layers = [];
-            animSequence = [];
-            document.querySelector('.layer-list').innerHTML = '';
-            document.querySelector('.sequence-list').innerHTML = '';
-
-            // 2. レイヤーを復元
-            for (const lData of data.layers) {
-                const newIdx = layers.length;
-                addLayer(); // 既存の追加関数を流用
-                const img = new Image();
-                img.src = lData.data;
-                await img.decode();
-                layers[newIdx].ctx.drawImage(img, 0, 0);
-                layers[newIdx].visible = lData.visible;
-            }
-
-            // 3. シーケンスを復元
-            data.sequence.forEach(s => {
-                addToSequence(s.layerId); // 既存の追加関数を流用
-            });
-
-            // 4. 設定を反映
-            elFps.value = data.fps;
-            vFps.innerText = data.fps;
-            
-            alert("Project Loaded Successfully!");
-            switchTab('draw'); // 読み込み後にお絵描き画面へ戻す
-        } catch (err) {
-            console.error(err);
-            alert("Failed to load .animx file.");
-        }
-    };
-    reader.readAsText(file);
-}
-
 
   async function exportAnimationAnimatedWebP(){
     if(animFrames.length === 0){ alert('No frames in SEQUENCE.'); return; }
-    
-    const w = cComp.width, h = cComp.height;
-    const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
-    const tctx = tmp.getContext('2d');
-    const frames = [];
-
-
-    const fpsVal = Number(document.getElementById('animFps').value) || 12;
-    const durationMs = Math.round(1000 / fpsVal);
-    
-
+    const w = cComp.width, h = cComp.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d'); const frames = [];
+    const fpsVal = Number(document.getElementById('animFps').value) || 12; const durationMs = Math.round(1000 / fpsVal);
     const loopVal = Number(document.getElementById('animLoop').value) || 0;
-
-    const btn = document.getElementById('btnExportAnimWebP');
-    const originalText = btn.innerText;
-    btn.innerText = "Encoding...";
-
+    const btn = document.getElementById('btnExportAnimWebP'); const originalText = btn.innerText; btn.innerText = "Encoding...";
     try {
         for(const layerId of animFrames){
           const li = layers.findIndex(l=>l.id===layerId); if(li < 0) continue;
-          
-          tctx.clearRect(0,0,w,h); 
-          tctx.fillStyle = '#ffffff'; 
-          tctx.fillRect(0, 0, w, h);
-          tctx.drawImage(layers[li].canvas, 0, 0);
-    
+          tctx.clearRect(0,0,w,h); tctx.fillStyle = '#ffffff'; tctx.fillRect(0, 0, w, h); tctx.drawImage(layers[li].canvas, 0, 0);
           const blob = await new Promise(res=> tmp.toBlob(res, 'image/webp', 0.92));
-          if(!blob || blob.type !== 'image/webp'){ 
-             throw new Error('This browser does not support WebP encoding (returned ' + (blob ? blob.type : 'null') + ').'); 
-          }
-    
-          const ab = await blob.arrayBuffer();
-          const chunks = parseWebPImageChunks(ab);
-          frames.push({chunks, durationMs});
+          if(!blob || blob.type !== 'image/webp'){ throw new Error('WebP encoding failed.'); }
+          const ab = await blob.arrayBuffer(); const chunks = parseWebPImageChunks(ab); frames.push({chunks, durationMs});
         }
-    
-
         const webpBytes = buildAnimatedWebP({width:w, height:h, loopCount:loopVal, frames});
-        const outBlob = new Blob([webpBytes], {type:'image/webp'});
-    
-        const ts = new Date().toISOString().replace(/[:.]/g,'-');
-        downloadBlob(`AnimX_${ts}.webp`, outBlob);
-        
-    } catch(err) {
-        alert("Export Failed: " + err.message);
-        console.error(err);
-    } finally {
-        btn.innerText = originalText;
-    }
+        const outBlob = new Blob([webpBytes], {type:'image/webp'}); const ts = new Date().toISOString().replace(/[:.]/g,'-'); downloadBlob(`AnimX_${ts}.webp`, outBlob);
+    } catch(err) { alert("Export Failed: " + err.message); } finally { btn.innerText = originalText; }
   }
-  const btnExportAnimWebP = document.getElementById('btnExportAnimWebP');
-  btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
-  
-  const refImage = document.getElementById('refImage');
-  const uiToggle = document.getElementById('traceToggle') || document.getElementById('refToggle');
-  const uiYaw = document.getElementById('traceYaw');
-  const uiPitch = document.getElementById('tracePitch');
-  const uiOp = document.getElementById('refOp');
-  const CELL_W = 300, CELL_H = 300, START_CX = 150, START_CY = 150, CONTAINER_CW = 150, CONTAINER_CH = 150;
-  const LABEL_YAW = { "-2":"-90", "-1":"-45", "0":"0", "1":"45", "2":"90" };
-  const LABEL_PITCH = { "2":"30", "1":"15", "0":"0", "-1":"-15", "-2":"-30" };
+  const btnExportAnimWebP = document.getElementById('btnExportAnimWebP'); btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
 
-  function updateMatrixView(){
-    if(uiToggle && !uiToggle.checked){ if(refContainer) refContainer.style.display = 'none'; return; }
-    if(refContainer) refContainer.style.display = 'block';
-    const yawVal = parseInt(uiYaw.value); const pitchVal = parseInt(uiPitch.value); 
-    const zoomVal = 1.5; const opVal = parseFloat(uiOp.value);
-    const elYaw = document.getElementById('vYaw'), elPitch = document.getElementById('vPitch');
-    const elOp = document.getElementById('vRefOp');
-    if(elYaw) elYaw.innerText = (LABEL_YAW[yawVal] || yawVal) + "°";
-    if(elPitch) elPitch.innerText = (LABEL_PITCH[pitchVal] || pitchVal) + "°";
-    if(elOp) elOp.innerText = opVal.toFixed(2);
-    if(refContainer){
-        refContainer.style.opacity = opVal; 
-        refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`;
-        refContainer.style.width = `${CELL_W}px`;
-        refContainer.style.height = `${CELL_H}px`;
-    }
-    const col = yawVal + 2; const row = 2 - pitchVal; 
-    const cx = START_CX + col * CELL_W; const cy = START_CY + row * CELL_H;
-    const targetX = CONTAINER_CW - cx; const targetY = CONTAINER_CH - cy;
-    if(refImage){ refImage.style.transform = `translate(${targetX}px, ${targetY}px)`; }
-  }
-
-  const controls = [uiToggle, uiYaw, uiPitch, uiOp];
-  controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
-
-// ---- Help Modal Logic ----
-  const btnHelp = document.getElementById('btnHelp');
-  const helpModal = document.getElementById('helpModal');
-  const btnCloseHelp = document.getElementById('btnCloseHelp');
-
-  if (btnHelp && helpModal && btnCloseHelp) {
-    // HELPタブをクリックで表示
-    btnHelp.addEventListener('click', () => {
-      helpModal.classList.add('show');
-    });
-    
-    // ×ボタンで閉じる
-    btnCloseHelp.addEventListener('click', () => {
-      helpModal.classList.remove('show');
-    });
-    
-    // モーダルの外側（背景）をクリックしても閉じる
-    helpModal.addEventListener('pointerdown', (e) => {
-      if (e.target === helpModal) {
-        helpModal.classList.remove('show');
-      }
-    });
-  }
-
-// 1. iPad/Safariで動く動画形式を自動で選ぶ
   function pickMime(){
-    const candidates = [
-      'video/mp4;codecs=avc1.42E01E', // iPad/iPhoneの標準
-      'video/mp4;codecs=avc1',
-      'video/mp4',
-      'video/webm;codecs=vp9',
-      'video/webm'
-    ];
-    for (const m of candidates){
-      if (MediaRecorder.isTypeSupported(m)) return m;
-    }
-    return '';
+    const candidates = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    for (const m of candidates){ if (MediaRecorder.isTypeSupported(m)) return m; } return '';
   }
 
-  // 2. iPadでのファイル保存失敗（破損）を防ぐ
-  function downloadBlob(filename, blob){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    // iPadはシステムがファイルを拾うまで時間がかかるため、30秒待ってから消去
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 30000);
-  }
-
-  // 3. メインの書き出しロジック
   async function exportAnimationMP4() {
     if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
-    
-    const btn = document.getElementById('btnExportAnimMP4');
-    const originalText = btn.innerText;
-    btn.innerText = "Encoding...";
-
-    const fpsVal = Number(document.getElementById('animFps').value) || 12;
-    const durationMs = 1000 / fpsVal;
-    
-    // キャンバスから映像ストリームを取得 (0fps=手動フレーム送り)
-    const stream = cComp.captureStream(fpsVal); 
-    const track = stream.getVideoTracks()[0];
-    const mimeType = pickMime();
-
+    const btn = document.getElementById('btnExportAnimMP4'); const originalText = btn.innerText; btn.innerText = "Encoding...";
+    const fpsVal = Number(document.getElementById('animFps').value) || 12; const durationMs = 1000 / fpsVal;
+    const stream = cComp.captureStream(fpsVal); const track = stream.getVideoTracks()[0]; const mimeType = pickMime();
     let recorder;
-    try {
-      // 200msごとにデータを吐き出し(start(200))、メモリ爆発を防止
-      recorder = new MediaRecorder(stream, mimeType ? { 
-        mimeType,
-        videoBitsPerSecond: 2500000 
-      } : {});
-    } catch(e) {
-      alert("Recorder Error: " + e.message);
-      btn.innerText = originalText;
-      return;
-    }
-
-    const chunks = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    
+    try { recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2500000 } : {}); } catch(e) { alert("Recorder Error: " + e.message); btn.innerText = originalText; return; }
+    const chunks = []; recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => {
-      if (chunks.length === 0) {
-        alert("Export failed: No data recorded. (0 bytes)");
-        btn.innerText = originalText;
-        return;
-      }
-      const actualType = recorder.mimeType || 'video/mp4';
-      const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(chunks, { type: actualType });
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const def = 'AnimX';
-      let base = prompt('ファイル名（拡張子なし）', def);
-      if(base === null) { btn.innerText = originalText; return; } // キャンセル
-      base = base.trim() || def;
-      base = base.replace(/[\\\/:*?"<>|]+/g, '_').slice(0,64);
-      downloadBlob(`${base}.${ext}`, blob);
-      btn.innerText = originalText;
-      redrawComposite(); 
+      if (chunks.length === 0) { alert("Export failed"); btn.innerText = originalText; return; }
+      const actualType = recorder.mimeType || 'video/mp4'; const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: actualType }); const def = 'AnimX';
+      let base = prompt('ファイル名', def); if(base === null) { btn.innerText = originalText; return; }
+      base = base.trim() || def; base = base.replace(/[\\\/:*?"<>|]+/g, '_').slice(0,64); downloadBlob(`${base}.${ext}`, blob);
+      btn.innerText = originalText; redrawComposite(); 
     };
-
-    recorder.start(200); // 【重要】小刻みにデータを確定させてiPadのメモリを守る
-    stopAnimPlayback(); 
-
+    recorder.start(200); stopAnimPlayback(); 
     let i = 0;
     const recordOneFS = async () => {
-      if (i >= animFrames.length) {
-        // 最後のコマを少し長めに残して終了処理
-        setTimeout(() => recorder.stop(), 200);
-        return;
-      }
-
+      if (i >= animFrames.length) { setTimeout(() => recorder.stop(), 200); return; }
       const L = getLayerById(animFrames[i]);
       if (L) {
-        // 描画処理：背景を最初に塗りつぶす（焼き付き防止）
-        gComp.setTransform(1,0,0,1,0,0);
-        gComp.clearRect(0, 0, cComp.width, cComp.height);
-        gComp.fillStyle = '#ffffff';
-        gComp.fillRect(0, 0, cComp.width, cComp.height);
-        gComp.globalAlpha = 1.0;
-        gComp.drawImage(L.canvas, 0, 0);
-        
-      requestAnimationFrame(() => {});
-        if (track && track.requestFrame) {
-          track.requestFrame();
-        }
+        gComp.setTransform(1,0,0,1,0,0); gComp.clearRect(0, 0, cComp.width, cComp.height); gComp.fillStyle = '#ffffff'; gComp.fillRect(0, 0, cComp.width, cComp.height);
+        gComp.globalAlpha = 1.0; gComp.drawImage(L.canvas, 0, 0); requestAnimationFrame(() => {}); if (track && track.requestFrame) { track.requestFrame(); }
       }
-
-      i++;
-      // setTimeoutで1コマずつ確実にエンコード時間を確保
-      setTimeout(recordOneFS, durationMs);
+      i++; setTimeout(recordOneFS, durationMs);
     };
-
     recordOneFS();
   }
-
   document.getElementById('btnExportAnimMP4').onclick = exportAnimationMP4;
 
+  // ==========================================
+  // 8. 起動時の初期化実行
+  // ==========================================
+  window.addEventListener('load', resizeCanvasBase);
   addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
-  })();
+})();
 </script>
 </body>
-
 </html>
