@@ -501,12 +501,9 @@
     const cont = document.querySelector('.stageContainer');
     if(!cont) return;
     const r = cont.getBoundingClientRect();
-    
-    // ★ 修正：解像度を必ず「偶数」にする (X/Twitterのエンコード要件)
-    baseW = Math.floor((r.width - 40) / 2) * 2; 
-    baseH = Math.floor((r.height - 40) / 2) * 2;
-    if(baseW < 100) baseW = 100; 
-    if(baseH < 100) baseH = 100;
+    baseW = Math.floor(r.width - 40); 
+    baseH = Math.floor(r.height - 40);
+    if(baseW < 100) baseW = 100; if(baseH < 100) baseH = 100;
     
     cComp.width = cInput.width = baseW;
     cComp.height = cInput.height = baseH;
@@ -1214,110 +1211,100 @@ cInput.addEventListener('pointerdown', e => {
   }
   const btnExportAnimWebP = document.getElementById('btnExportAnimWebP'); btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
 
-  function pickMime(){
-    const candidates = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-    for (const m of candidates){ if (MediaRecorder.isTypeSupported(m)) return m; } return '';
-  }
-
-// --- MP4/WebMエクスポート（X/SNS互換性 最大化版） ---
+  // --- MP4エクスポート（FFmpeg.wasm版 / X投稿対応 真のH.264） ---
+  // SafariはMediaRecorderでMP4を出力できないため、FFmpeg.wasmでフレームを直接エンコードする
   async function exportAnimationMP4() {
     if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
+
     const btn = document.getElementById('btnExportAnimMP4');
     const originalText = btn.innerText;
-    btn.innerText = "Encoding...";
 
     const fpsVal = Number(document.getElementById('animFps').value) || 12;
-    const durationMs = 1000 / fpsVal;
 
-    // ★ 対策①：解像度を強制的に「偶数」にする (X/Twitterの絶対要件)
-    if (cComp.width % 2 !== 0) cComp.width -= 1;
-    if (cComp.height % 2 !== 0) cComp.height -= 1;
+    // 解像度は必ず偶数に（X/Twitterの必須要件）
+    let encW = cComp.width  % 2 === 0 ? cComp.width  : cComp.width  - 1;
+    let encH = cComp.height % 2 === 0 ? cComp.height : cComp.height - 1;
 
-    const stream = cComp.captureStream(fpsVal);
-    const track = stream.getVideoTracks()[0];
-    const mimeType = pickMime(); // iPadなら 'video/mp4;codecs=avc1...' を優先取得
+    btn.innerText = "Loading FFmpeg...";
 
-    let recorder;
     try {
-      recorder = new MediaRecorder(stream, { 
-        mimeType: mimeType || 'video/mp4',
-        videoBitsPerSecond: 4000000 // ビットレートを安定させる
-      });
-    } catch(e) {
-      alert("Recorder Error: " + e.message);
-      btn.innerText = originalText;
-      return;
-    }
+      // FFmpeg.wasm v0.12（CDN）を動的ロード
+      const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+      const { fetchFile, toBlobURL } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
 
-    const chunks = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    
-    recorder.onstop = () => {
-      if (chunks.length === 0) {
-        alert("Export failed: No data recorded.");
-        btn.innerText = originalText;
-        return;
+      const ffmpeg = new FFmpeg();
+
+      // SharedArrayBufferが使えない環境（iOS Safari等）用にシングルスレッド版コアを使う
+      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/esm';
+      let coreURL, wasmURL, workerURL;
+      try {
+        coreURL   = await toBlobURL(`${baseURL}/ffmpeg-core.js`,      'text/javascript');
+        wasmURL   = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`,     'application/wasm');
+        workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`,'text/javascript');
+        await ffmpeg.load({ coreURL, wasmURL, workerURL });
+      } catch(e) {
+        // マルチスレッド失敗 → シングルスレッドにフォールバック
+        const stURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+        const coreURL2 = await toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript');
+        const wasmURL2 = await toBlobURL(`${stURL}/ffmpeg-core.wasm`,'application/wasm');
+        await ffmpeg.load({ coreURL: coreURL2, wasmURL: wasmURL2 });
       }
 
-      // ★ 対策②：実際のMIMEタイプを厳密にチェックして拡張子を決める
-      const actualType = recorder.mimeType || 'video/mp4';
-      const isMP4 = actualType.includes('mp4');
-      const ext = isMP4 ? 'mp4' : 'webm'; // WebMなら正直に .webm にする
+      btn.innerText = "Encoding frames...";
+      stopAnimPlayback();
 
-      const blob = new Blob(chunks, { type: actualType });
-      let base = prompt(`ファイル名を入力 (拡張子は自動で .${ext} になります):`, 'AnimX_Video');
-      if(base === null) { btn.innerText = originalText; return; }
+      // 一時キャンバスでフレームをPNG化してFFmpegに渡す
+      const tmp = document.createElement('canvas');
+      tmp.width = encW; tmp.height = encH;
+      const tctx = tmp.getContext('2d');
+
+      for (let i = 0; i < animFrames.length; i++) {
+        const L = getLayerById(animFrames[i]);
+        tctx.fillStyle = '#ffffff';
+        tctx.fillRect(0, 0, encW, encH);
+        if (L) tctx.drawImage(L.canvas, 0, 0, encW, encH);
+
+        const frameBlob = await new Promise(r => tmp.toBlob(r, 'image/png'));
+        const frameArr  = new Uint8Array(await frameBlob.arrayBuffer());
+        // フレームを frame000.png, frame001.png ... の形式でFFmpegのFS上に書く
+        await ffmpeg.writeFile(`frame${String(i).padStart(4,'0')}.png`, frameArr);
+
+        btn.innerText = `Encoding frames... ${i+1}/${animFrames.length}`;
+      }
+
+      btn.innerText = "Muxing MP4...";
+
+      // H.264 / yuv420p でエンコード（Xが要求する最も互換性の高い設定）
+      await ffmpeg.exec([
+        '-framerate', String(fpsVal),
+        '-i', 'frame%04d.png',
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',   // Xが必須とするピクセルフォーマット
+        '-preset', 'fast',
+        '-crf', '23',            // 品質（低いほど高品質・重い）
+        '-movflags', '+faststart', // ストリーミング互換のためmoovをファイル先頭へ
+        '-vf', `scale=${encW}:${encH}`, // 偶数を確実に
+        'out.mp4'
+      ]);
+
+      const outData = await ffmpeg.readFile('out.mp4');
+      const outBlob = new Blob([outData.buffer], { type: 'video/mp4' });
+
+      let base = prompt('ファイル名を入力:', 'AnimX_Video');
+      if (base === null) { btn.innerText = originalText; return; }
       base = base.trim() || 'AnimX_Video';
-      
-      downloadBlob(`${base}.${ext}`, blob);
+      downloadBlob(`${base}.mp4`, outBlob);
+
+      redrawComposite();
       btn.innerText = originalText;
-      redrawComposite(); 
+      alert("MP4書き出し完了！\nH.264 / yuv420p で出力されました。Xにそのまま投稿できます。");
 
-      // ユーザーへのフィードバック
-      if (!isMP4) {
-        alert("【報告】このブラウザはMP4生成に未対応のため WebM で保存しました。\nX(Twitter)に投稿できない場合は、保存した動画をiPadの「写真」アプリ等で一度読み込み、再度書き出してください。");
-      }
-    };
-
-    stopAnimPlayback(); 
-
-    // フレーム描画用ヘルパー
-    const renderFrame = (index) => {
-      const L = getLayerById(animFrames[index]);
-      if (L) {
-        gComp.setTransform(1,0,0,1,0,0);
-        gComp.fillStyle = '#ffffff'; // 背景白塗り（透過によるXのアップロードエラー防止）
-        gComp.fillRect(0, 0, cComp.width, cComp.height);
-        gComp.globalAlpha = 1.0;
-        gComp.drawImage(L.canvas, 0, 0);
-      }
-    };
-
-    // ★ 対策③：録画開始「前」に最初のフレームを描画し、反映を待つ (初動欠落防止)
-    renderFrame(0);
-    await new Promise(r => requestAnimationFrame(r));
-    
-    recorder.start(); // timeslice(200)はメタデータ破壊の原因になるため引数なしで開始
-
-    let i = 0;
-    const recordOneFS = async () => {
-      if (i >= animFrames.length) {
-        // ★ 対策④：最後に余裕(500ms)を持たせて停止し、動画の「尺(Duration)」を確定させる
-        setTimeout(() => recorder.stop(), 500);
-        return;
-      }
-
-      renderFrame(i);
-      if (track && track.requestFrame) track.requestFrame();
-      
-      i++;
-      setTimeout(recordOneFS, durationMs);
-    };
-    
-    setTimeout(recordOneFS, durationMs);
+    } catch(err) {
+      console.error(err);
+      alert("MP4エンコード失敗: " + err.message + "\n\nネットワーク接続を確認してください（FFmpeg.wasmのロードが必要です）。");
+      btn.innerText = originalText;
+    }
   }
-
-  // ボタンにイベントを登録
   document.getElementById('btnExportAnimMP4').onclick = exportAnimationMP4;
 
   // ==========================================
