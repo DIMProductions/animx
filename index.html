@@ -1325,6 +1325,32 @@ document.getElementById('btnExportANIMX').onclick = () => {
   let initialPinchDist = null;
   let initialScale = 1.0;
 
+// --- 描画の管理 ---
+  cInput.addEventListener('pointerdown', e => {
+    if (currentTab !== 'draw') return;
+
+    // ★追加：指（touch）の場合、またはピンチズーム中は絶対に描画を開始しない
+    if (e.pointerType === 'touch' || isPinching) {
+      return; 
+    }
+
+    const p = evPos(e, cInput); // (座標取得の独自関数があればそれに合わせる)
+    lastPointer = {x: p.x, y: p.y};
+    
+    // ...以降、既存の描画開始処理（drawing = true; など）
+  });
+
+  cInput.addEventListener('pointermove', e => {
+    // ★追加：移動中も指やピンチズーム中なら描画処理をスキップ
+    if (e.pointerType === 'touch' || isPinching) {
+      return;
+    }
+
+    if (!drawing) return;
+
+    // ...以降、既存の線を引く処理
+  });
+
   // 1. 指とペンの使い分け
   cInput.addEventListener('pointerdown', e => { 
     if (currentTab !== 'draw') return;
@@ -1377,6 +1403,32 @@ document.getElementById('btnExportANIMX').onclick = () => {
 
   stageContainer.addEventListener('touchend', () => {
     initialPinchDist = null;
+  });
+
+// --- ピンチズームの管理 ---
+  let isPinching = false; // ★ズーム中かどうかを判定するフラグ
+  let initialPinchDist = null;
+  let initialScale = 1.0;
+
+  stageContainer.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      
+      isPinching = true; // ★ズーム状態をON
+      drawing = false;   // ★ズームした瞬間に描画を強制キャンセル！
+
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      initialPinchDist = d;
+      initialScale = currentScale; // (もし独自の変数名があればそれに合わせてください)
+    }
+  }, { passive: false });
+
+  // 指が離れたらズーム状態を解除
+  stageContainer.addEventListener('touchend', e => {
+    if (e.touches.length < 2) {
+      isPinching = false;
+      initialPinchDist = null;
+    }
   });
 
 // スライダーでのズーム：画面中央を起点にする
