@@ -21,9 +21,36 @@
     }
 
     /* Top Bar */
-    .topbar{
-      height:54px; background:linear-gradient(180deg, #0f131b, #0b0e14);
-      border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 12px; gap:12px;
+    /* トップバーを3セクションに分割して中央揃えを実現 */
+    .topbar {
+      height: 54px;
+      background: linear-gradient(180deg, #0f131b, #0b0e14);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: space-between;
+    }
+
+    .topbar-left, .topbar-right {
+      flex: 1; /* 左右の幅を均等に広げて中央を押し出す */
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .topbar-right {
+      justify-content: flex-end;
+    }
+
+    .topbar-center {
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 3px;
+      color: var(--text);
+      text-align: center;
+      flex: 0; /* 中央はコンテンツ幅に合わせる */
+      white-space: nowrap;
     }
     .brand{ font-weight:700; font-size:13px; padding:6px 10px; border:1px solid var(--line); background:#0d1016; border-radius:10px; }
     .tabs{ display:flex; gap:6px; align-items:center; }
@@ -157,27 +184,95 @@
     .seqBtn{ font-size:11px; padding:4px 8px; border:1px solid var(--line); border-radius:10px; cursor:pointer; user-select:none; }
     .seqBtn:hover{ background:rgba(255,255,255,0.04); }
 
+/* ---- Help Modal Styles ---- */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(10, 13, 18, 0.8);
+      z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);
+    }
+    .modal-overlay.show { display: flex; animation: fadeIn 0.2s ease-out; }
+    .modal-content {
+      background: var(--ui); border: 1px solid var(--line); border-radius: 14px;
+      width: 90%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8); transform: translateY(10px); animation: slideUp 0.2s ease-out forwards;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--ui2);
+      border-radius: 14px 14px 0 0;
+    }
+    .modal-header h2 { margin: 0; font-size: 15px; color: var(--text); }
+    .close-btn { cursor: pointer; font-size: 22px; color: var(--muted); line-height: 1; transition: 0.1s; }
+    .close-btn:hover { color: var(--danger); }
+    .modal-body {
+      padding: 18px; overflow-y: auto; font-size: 13px; color: var(--muted); line-height: 1.6;
+    }
+    .modal-body h3 { color: var(--accent); font-size: 14px; margin: 18px 0 8px 0; border-bottom: 1px solid #222; padding-bottom: 4px; }
+    .modal-body h3:first-child { margin-top: 0; }
+    .modal-body ul { margin: 0; padding-left: 20px; }
+    .modal-body li { margin-bottom: 8px; }
+    .modal-body strong { color: var(--text); font-weight: 600; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(10px); } to { transform: translateY(0); } }
+
 </style>
 </head>
 
 <body>
 <div class="topbar">
-  <a href="https://dim.productions/" target="_blank" style="display:flex; align-items:center; text-decoration:none; gap:10px;">
-    <img src="source/dimplogo.svg" alt="DIM Logo" style="height:32px; width:auto;">
-  </a>
-
-  <div class="tabs">
-    <div class="brand">AnimX</div>
-    <div class="tab on" data-tab="draw">DRAW</div>
-    <div class="tab" data-tab="export">INPORT/EXPORT</div>
-    <div class="tab" data-tab="anim">ANIM</div>
+  <div class="topbar-left">
+    <a href="https://dim.productions/" target="_blank" style="display:flex; align-items:center;">
+      <img src="source/dimplogo.svg" alt="DIM Logo" style="height:30px; width:auto;">
+    </a>
+    <div class="tabs">
+      <div class="tab on" data-tab="draw">DRAW</div>
+      <div class="tab" data-tab="export">IMPORT/EXPORT</div>
+      <div class="tab" data-tab="anim">ANIM</div>
+      <div class="tab" id="btnHelp" style="color: var(--accent); border-color: rgba(0,208,255,.3); margin-left: 8px;">HELP</div>
+    </div>
   </div>
 
-  <a href="https://ko-fi.com/dimproductions" target="_blank" class="support-link">
-    <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi">
-    <span>Support us</span>
-  </a>
+  <div class="topbar-center">AnimX</div>
+
+  <div class="topbar-right">
+    <a href="https://ko-fi.com/dimproductions" target="_blank" class="support-link">
+      <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi">
+      <span>Support us</span>
+    </a>
+  </div>
 </div>
+
+  <div id="helpModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>AnimX Quick Guide</h2>
+        <span class="close-btn" id="btnCloseHelp">&times;</span>
+      </div>
+      <div class="modal-body">
+        <h3>1. DRAW (Drawing & Layers)</h3>
+        <ul>
+          <li><strong>Tools:</strong> Use the <b>G-Pen</b> for clean, pressure-sensitive lines, or the <b>Shadow</b> tool for watercolor-like blending.</li>
+          <li><strong>3D Reference:</strong> Toggle the 3D reference and adjust Yaw/Pitch to guide your character's angles.</li>
+          <li><strong>Layers:</strong> Each layer can act as a single frame for your animation. Add, duplicate, or reorder them in the right panel.</li>
+        </ul>
+
+        <h3>2. ANIM (Animation Sequence)</h3>
+        <ul>
+          <li>Switch to the <strong>ANIM</strong> tab to start building your animation timeline.</li>
+          <li>Click on a layer thumbnail to append it to your <strong>Sequence</strong>.</li>
+          <li><strong>Drag & Drop</strong> items in the Sequence list to reorder them, or use the Copy/Del buttons.</li>
+          <li>Adjust the <strong>FPS</strong> (speed) and hit <strong>Play</strong> to preview your work.</li>
+        </ul>
+
+        <h3>3. EXPORT (Save & Share)</h3>
+        <ul>
+          <li>Go to the <strong>IMPORT/EXPORT</strong> tab when you are ready.</li>
+          <li><strong>Export MP4 (iPad):</strong> The most reliable format for iOS and social media sharing.</li>
+          <li><strong>Export .animx:</strong> Saves your entire project (layers, sequences, and settings) so you can import and edit it later.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 
   <div class="main">
     <div class="panel">
@@ -1316,6 +1411,30 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
 
   const controls = [uiToggle, uiYaw, uiPitch, uiOp];
   controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
+
+// ---- Help Modal Logic ----
+  const btnHelp = document.getElementById('btnHelp');
+  const helpModal = document.getElementById('helpModal');
+  const btnCloseHelp = document.getElementById('btnCloseHelp');
+
+  if (btnHelp && helpModal && btnCloseHelp) {
+    // HELPタブをクリックで表示
+    btnHelp.addEventListener('click', () => {
+      helpModal.classList.add('show');
+    });
+    
+    // ×ボタンで閉じる
+    btnCloseHelp.addEventListener('click', () => {
+      helpModal.classList.remove('show');
+    });
+    
+    // モーダルの外側（背景）をクリックしても閉じる
+    helpModal.addEventListener('pointerdown', (e) => {
+      if (e.target === helpModal) {
+        helpModal.classList.remove('show');
+      }
+    });
+  }
 
 // 1. iPad/Safariで動く動画形式を自動で選ぶ
   function pickMime(){
