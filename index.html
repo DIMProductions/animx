@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AnimX</title>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#001a33">
@@ -138,12 +138,15 @@
     }
     
     /* Stage (The actual canvas) */
-    .stage{ 
+.stage { 
       position: relative; 
       background: var(--canvas); 
-      overflow: hidden; touch-action: none; 
+      overflow: hidden; 
+      touch-action: none; 
       box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      cursor: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,2 L12,22 M2,12 L22,12" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M12,2 L12,22 M2,12 L22,12" stroke="black" stroke-width="1" stroke-linecap="round"/></svg>') 12 12, crosshair;
+
+      /* カーソル修正版：外側を黒、内側をシアンにして視認性をアップ */
+      cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='%2300d0ff' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
       
       transform-origin: 0 0;
     }
@@ -228,7 +231,7 @@
       background: var(--canvas); 
       overflow: hidden; 
       /* 指でのスクロールを許可し、ブラウザの拡大を防止 */
-      touch-action: pinch-zoom; 
+      touch-action: none; 
       box-shadow: 0 0 20px rgba(0,0,0,0.5);
       cursor: crosshair;
       transform-origin: 0 0;
@@ -507,21 +510,35 @@
   }
 
   // Wheel zoom -> Zoom to Mouse
-  stageContainer.addEventListener('wheel', (e) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      const rect = stageContainer.getBoundingClientRect();
-      const ox = e.clientX - rect.left;
-      const oy = e.clientY - rect.top;
-      const delta = e.deltaY > 0 ? -10 : 10;
-      let nextVal = Math.round(currentScale * 100) + delta;
-      nextVal = Math.max(10, Math.min(400, nextVal)); 
-      const nextScale = nextVal / 100;
-      elZoom.value = nextVal;
-      vZoom.innerText = nextVal + '%';
-      zoomToPoint(nextScale, ox, oy);
+// ページ全体のスクロールやズームを防止しつつ、キャンバス内だけ処理する
+  stageContainer.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault(); // ブラウザのズームを阻止
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      initialPinchDist = d;
+      initialScale = currentScale;
     }
-  }, { passive: false });
+  }, { passive: false }); // preventDefaultを使うために passive: false にする
+
+  stageContainer.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && initialPinchDist) {
+      e.preventDefault(); // ここでもブラウザの挙動を阻止
+      
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      const ratio = d / initialPinchDist;
+      let nextScale = initialScale * ratio;
+      nextScale = Math.max(0.1, Math.min(4, nextScale));
+      
+      const rect = stageContainer.getBoundingClientRect();
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      
+      zoomToPoint(nextScale, centerX, centerY);
+      
+      elZoom.value = Math.round(nextScale * 100);
+      vZoom.innerText = elZoom.value + '%';
+    }
+  }, { passive: false }); // 大事：passive: false
 
   window.addEventListener('load', resizeCanvasBase);
 
@@ -1246,10 +1263,29 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
       ui: { active_layer_id: layers[activeIdx]?.id ?? null, active_frame_index: activeAnimIdx }
     };
   }
-  document.getElementById('btnExportANIMX').onclick=()=>{
-    const proj = buildAnimxProject(); const text = JSON.stringify(proj);
-    const blob = new Blob([text], {type:'application/json'}); const ts = new Date().toISOString().replace(/[:.]/g,'-');
-    downloadBlob(`project_${ts}.animx`, blob);
+document.getElementById('btnExportANIMX').onclick = () => {
+    // 1. 保存するファイル名を入力してもらう
+    let filename = prompt("Enter project name:", "my_project");
+
+    // キャンセルされた場合は処理を中断
+    if (filename === null) return;
+
+    // 空入力の場合はデフォルト名にする
+    if (filename.trim() === "") {
+      filename = "project_" + new Date().getTime();
+    }
+
+    // 2. 拡張子 .animx が付いていなければ自動で付ける
+    if (!filename.endsWith('.animx')) {
+      filename += '.animx';
+    }
+
+    // 3. プロジェクトデータの書き出し（Safari対策込み）
+    const proj = buildAnimxProject(); 
+    const text = JSON.stringify(proj);
+    const blob = new Blob([text], {type: 'application/octet-stream'}); 
+
+    downloadBlob(filename, blob);
   };
 
   const fileImportAnimx = document.getElementById('fileImportAnimx');
@@ -1412,6 +1448,83 @@ const btnAnimPlay = document.getElementById('btnAnimPlay');
     let o=12; for(const c of chunksOut){ out.set(c,o); o+=c.length; }
     return out;
   }
+
+// プロジェクト全体の保存
+async function saveProjectAsAnimX() {
+    const projectData = {
+        version: "1.0",
+        fps: parseInt(elFps.value),
+        // 全レイヤーの画像をDataURLとして保存
+        layers: layers.map(l => ({
+            name: l.name,
+            visible: l.visible,
+            data: l.ctx.canvas.toDataURL("image/png")
+        })),
+        // アニメーションの再生順序
+        sequence: animSequence.map(s => ({
+            layerId: s.layerId,
+            duration: s.duration
+        }))
+    };
+
+    const json = JSON.stringify(projectData);
+    const blob = new Blob([json], { type: 'application/octet-stream' }); // Safari対策
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project_${new Date().getTime()}.animx`;
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+// ファイル選択ダイアログを開いて読み込む
+function importAnimXProject(file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            // 1. 既存のレイヤーとシーケンスをクリア
+            layers = [];
+            animSequence = [];
+            document.querySelector('.layer-list').innerHTML = '';
+            document.querySelector('.sequence-list').innerHTML = '';
+
+            // 2. レイヤーを復元
+            for (const lData of data.layers) {
+                const newIdx = layers.length;
+                addLayer(); // 既存の追加関数を流用
+                const img = new Image();
+                img.src = lData.data;
+                await img.decode();
+                layers[newIdx].ctx.drawImage(img, 0, 0);
+                layers[newIdx].visible = lData.visible;
+            }
+
+            // 3. シーケンスを復元
+            data.sequence.forEach(s => {
+                addToSequence(s.layerId); // 既存の追加関数を流用
+            });
+
+            // 4. 設定を反映
+            elFps.value = data.fps;
+            vFps.innerText = data.fps;
+            
+            alert("Project Loaded Successfully!");
+            switchTab('draw'); // 読み込み後にお絵描き画面へ戻す
+        } catch (err) {
+            console.error(err);
+            alert("Failed to load .animx file.");
+        }
+    };
+    reader.readAsText(file);
+}
 
 
   async function exportAnimationAnimatedWebP(){
