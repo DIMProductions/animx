@@ -1321,18 +1321,32 @@ document.getElementById('btnExportANIMX').onclick = () => {
     try{ const text = await f.text(); await applyAnimxProject(JSON.parse(text)); }catch(e){ alert('Import failed'); }finally{ fileImportAnimx.value = ''; }
   });
 
-// ---- iPad/Touch Navigation Logic ----
+// ---- iPad/Touch & Pen Separation Logic ----
   let initialPinchDist = null;
   let initialScale = 1.0;
+  let touchActive = false; // ★指が画面に触れているかを監視する絶対的なフラグ
 
-  // 1. 指とペンの使い分け
+  // 1. 【指の監視】画面のどこかに指が触れたら、即座に「タッチ中」とする
+  document.addEventListener('touchstart', (e) => {
+    touchActive = true;
+    if (drawing) { // もしペンで描いている最中なら強制キャンセル
+      drawing = false;
+      const ctx = layers[activeIdx].ctx;
+      gInput.clearRect(0, 0, cInput.width, cInput.height);
+      pts = []; redrawComposite();
+    }
+  }, { capture: true, passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) touchActive = false;
+  }, { capture: true, passive: true });
+
+  // 2. 【ペンの制御】指が触れている間は、pointerイベントを絶対に無視する
   cInput.addEventListener('pointerdown', e => { 
     if (currentTab !== 'draw') return;
-
-    // iPad/iPhoneで「指」の場合は描画を開始しない（ネイティブスクロールに任せる）
-    if (e.pointerType === 'touch' && toolType !== 'select') {
-      return; 
-    }
+    
+    // ★ここが最大のポイント：touchActiveがtrueなら、ペンだろうがマウスだろうが弾く
+    if (touchActive || e.pointerType === 'touch') return; 
 
     const p = evPos(e, cInput);
     lastPointer = {x: p.x, y: p.y};
@@ -1347,17 +1361,19 @@ document.getElementById('btnExportANIMX').onclick = () => {
     strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
   });
 
-  // 2. ピンチズーム（二本指での拡大縮小）のサポート
+  // 3. ピンチズーム（キャンバス移動・拡大）
   stageContainer.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
+    if (e.touches.length >= 2) {
+      e.preventDefault(); // Safariの画面全体ズームを阻止
       const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
       initialPinchDist = d;
       initialScale = currentScale;
     }
-  }, { passive: true });
+  }, { passive: false });
 
   stageContainer.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && initialPinchDist) {
+    if (e.touches.length >= 2 && initialPinchDist) {
+      e.preventDefault();
       const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
       const ratio = d / initialPinchDist;
       let nextScale = initialScale * ratio;
@@ -1368,12 +1384,10 @@ document.getElementById('btnExportANIMX').onclick = () => {
       const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
       
       zoomToPoint(nextScale, centerX, centerY);
-      
-      // スライダーの値も同期させる
       elZoom.value = Math.round(nextScale * 100);
       vZoom.innerText = elZoom.value + '%';
     }
-  }, { passive: true });
+  }, { passive: false });
 
   stageContainer.addEventListener('touchend', () => {
     initialPinchDist = null;
@@ -1764,4 +1778,5 @@ function importAnimXProject(file) {
   })();
 </script>
 </body>
+
 </html>
