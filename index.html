@@ -87,10 +87,14 @@
     .stageContainer { flex: 1; overflow: auto; background: #101216; border-radius: 4px; display: grid; }
     #canvasScaleTarget { margin: auto; display: block; position: relative; }
     
-    .stage { 
-      position: relative; background: var(--canvas); overflow: hidden; 
-      touch-action: none; box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12,2 L12,22 M2,12 L22,12' stroke='%2300d0ff' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+.stage { 
+      position: relative; 
+      background: var(--canvas); 
+      overflow: hidden; 
+      /* pinch-zoom から none に変更して、ブラウザの干渉を完全に防ぐ */
+      touch-action: none; 
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      cursor: crosshair;
       transform-origin: 0 0;
     }
 
@@ -1138,32 +1142,85 @@
     for (const m of candidates){ if (MediaRecorder.isTypeSupported(m)) return m; } return '';
   }
 
+// --- MP4エクスポート（X/SNS互換性アップ版） ---
   async function exportAnimationMP4() {
     if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
-    const btn = document.getElementById('btnExportAnimMP4'); const originalText = btn.innerText; btn.innerText = "Encoding...";
-    const fpsVal = Number(document.getElementById('animFps').value) || 12; const durationMs = 1000 / fpsVal;
-    const stream = cComp.captureStream(fpsVal); const track = stream.getVideoTracks()[0]; const mimeType = pickMime();
+    
+    const btn = document.getElementById('btnExportAnimMP4');
+    const originalText = btn.innerText;
+    btn.innerText = "Encoding...";
+
+    const fpsVal = Number(document.getElementById('animFps').value) || 12;
+    const durationMs = 1000 / fpsVal;
+    
+    // Xに最も好まれる H.264 / AVC の設定を優先
+    const mimeType = pickMime();
+    const stream = cComp.captureStream(fpsVal); 
+    const track = stream.getVideoTracks()[0];
+
     let recorder;
-    try { recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2500000 } : {}); } catch(e) { alert("Recorder Error: " + e.message); btn.innerText = originalText; return; }
-    const chunks = []; recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => {
-      if (chunks.length === 0) { alert("Export failed"); btn.innerText = originalText; return; }
-      const actualType = recorder.mimeType || 'video/mp4'; const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(chunks, { type: actualType }); const def = 'AnimX';
-      let base = prompt('ファイル名', def); if(base === null) { btn.innerText = originalText; return; }
-      base = base.trim() || def; base = base.replace(/[\\\/:*?"<>|]+/g, '_').slice(0,64); downloadBlob(`${base}.${ext}`, blob);
-      btn.innerText = originalText; redrawComposite(); 
+    try {
+      recorder = new MediaRecorder(stream, { 
+        mimeType: mimeType || 'video/mp4',
+        videoBitsPerSecond: 4000000 // 画質を少し上げて安定させる
+      });
+    } catch(e) {
+      alert("Recorder Error: " + e.message);
+      btn.innerText = originalText;
+      return;
+    }
+
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    
+    recorder.onstop = async () => {
+      if (chunks.length === 0) {
+        alert("Export failed: No data recorded.");
+        btn.innerText = originalText;
+        return;
+      }
+
+      const actualType = recorder.mimeType || 'video/mp4';
+      const blob = new Blob(chunks, { type: actualType });
+      
+      // 保存ファイル名の決定
+      const def = 'AnimX_Project';
+      let base = prompt('Save as:', def);
+      if(base === null) { btn.innerText = originalText; return; }
+      base = base.trim() || def;
+      
+      // 拡張子の自動決定
+      const ext = actualType.includes('mp4') ? 'mp4' : 'webm';
+      downloadBlob(`${base}.${ext}`, blob);
+
+      btn.innerText = originalText;
+      redrawComposite(); 
+      alert("Export Complete! (Note: If X upload fails, try refreshing or using Safari on iPad)");
     };
-    recorder.start(200); stopAnimPlayback(); 
+
+    recorder.start(); // 小刻みなstartは一旦やめ、一気に録画してヘッダーを安定させる
+    stopAnimPlayback(); 
+
     let i = 0;
     const recordOneFS = async () => {
-      if (i >= animFrames.length) { setTimeout(() => recorder.stop(), 200); return; }
+      if (i >= animFrames.length) {
+        setTimeout(() => recorder.stop(), 500); // 最後に余裕を持たせてヘッダーを閉じさせる
+        return;
+      }
+
       const L = getLayerById(animFrames[i]);
       if (L) {
-        gComp.setTransform(1,0,0,1,0,0); gComp.clearRect(0, 0, cComp.width, cComp.height); gComp.fillStyle = '#ffffff'; gComp.fillRect(0, 0, cComp.width, cComp.height);
-        gComp.globalAlpha = 1.0; gComp.drawImage(L.canvas, 0, 0); requestAnimationFrame(() => {}); if (track && track.requestFrame) { track.requestFrame(); }
+        // Xで拒否されやすい透過を防ぐため、背景を白で塗りつぶす
+        gComp.setTransform(1,0,0,1,0,0);
+        gComp.fillStyle = '#ffffff';
+        gComp.fillRect(0, 0, cComp.width, cComp.height);
+        gComp.globalAlpha = 1.0;
+        gComp.drawImage(L.canvas, 0, 0);
+        
+        if (track && track.requestFrame) track.requestFrame();
       }
-      i++; setTimeout(recordOneFS, durationMs);
+      i++;
+      setTimeout(recordOneFS, durationMs);
     };
     recordOneFS();
   }
