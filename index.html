@@ -1211,85 +1211,94 @@ cInput.addEventListener('pointerdown', e => {
   }
   const btnExportAnimWebP = document.getElementById('btnExportAnimWebP'); btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
 
-  // --- MP4エクスポート（FFmpeg.wasm版 / X投稿対応 真のH.264） ---
-  // SafariはMediaRecorderでMP4を出力できないため、FFmpeg.wasmでフレームを直接エンコードする
+  // --- MP4エクスポート（WebCodecs + mp4-muxer版 / CORS問題なし / X投稿対応） ---
+  // mp4-muxerはCDN1ファイルのみ・CORSなし。WebCodecs APIでH.264エンコード。
   async function exportAnimationMP4() {
     if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
 
     const btn = document.getElementById('btnExportAnimMP4');
     const originalText = btn.innerText;
+    btn.innerText = "Loading...";
 
-    const fpsVal = Number(document.getElementById('animFps').value) || 12;
+    // WebCodecs API サポートチェック（Safari 16.4+ / Chrome / Edge 対応）
+    if (typeof VideoEncoder === 'undefined') {
+      alert('このブラウザはVideoEncoder（WebCodecs）に対応していません。\niOS 16以上のSafari、またはChromeをお試しください。');
+      btn.innerText = originalText;
+      return;
+    }
 
-    // 解像度は必ず偶数に（X/Twitterの必須要件）
-    let encW = cComp.width  % 2 === 0 ? cComp.width  : cComp.width  - 1;
-    let encH = cComp.height % 2 === 0 ? cComp.height : cComp.height - 1;
-
-    btn.innerText = "Loading FFmpeg...";
+    const fpsVal   = Number(document.getElementById('animFps').value) || 12;
+    // 解像度は偶数必須（Xの要件）
+    const encW = cComp.width  % 2 === 0 ? cComp.width  : cComp.width  - 1;
+    const encH = cComp.height % 2 === 0 ? cComp.height : cComp.height - 1;
+    const frameDurationUs = Math.round(1_000_000 / fpsVal); // マイクロ秒単位
 
     try {
-      // FFmpeg.wasm v0.12（CDN）を動的ロード
-      const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-      const { fetchFile, toBlobURL } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
+      // mp4-muxer を動的インポート（jsDelivrから・CORS問題なし）
+      btn.innerText = "Loading muxer...";
+      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.js');
 
-      const ffmpeg = new FFmpeg();
+      const target = new ArrayBufferTarget();
+      const muxer  = new Muxer({
+        target,
+        video: { codec: 'avc', width: encW, height: encH },
+        fastStart: 'in-memory', // moovを先頭に（X対応）
+      });
 
-      // SharedArrayBufferが使えない環境（iOS Safari等）用にシングルスレッド版コアを使う
-      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/esm';
-      let coreURL, wasmURL, workerURL;
-      try {
-        coreURL   = await toBlobURL(`${baseURL}/ffmpeg-core.js`,      'text/javascript');
-        wasmURL   = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`,     'application/wasm');
-        workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`,'text/javascript');
-        await ffmpeg.load({ coreURL, wasmURL, workerURL });
-      } catch(e) {
-        // マルチスレッド失敗 → シングルスレッドにフォールバック
-        const stURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-        const coreURL2 = await toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript');
-        const wasmURL2 = await toBlobURL(`${stURL}/ffmpeg-core.wasm`,'application/wasm');
-        await ffmpeg.load({ coreURL: coreURL2, wasmURL: wasmURL2 });
-      }
+      // VideoEncoder セットアップ
+      const encodedChunks = [];
+      let encError = null;
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: (e) => { encError = e; },
+      });
 
-      btn.innerText = "Encoding frames...";
+      // H.264 Baseline プロファイル（最大互換）
+      await encoder.configure({
+        codec:          'avc1.42E01E', // H.264 Constrained Baseline Level 3.0
+        width:           encW,
+        height:          encH,
+        bitrate:         4_000_000,
+        framerate:       fpsVal,
+        avc:            { format: 'avc' },
+      });
+
+      // フレーム描画 → VideoFrameとしてエンコード
       stopAnimPlayback();
-
-      // 一時キャンバスでフレームをPNG化してFFmpegに渡す
       const tmp = document.createElement('canvas');
       tmp.width = encW; tmp.height = encH;
       const tctx = tmp.getContext('2d');
 
       for (let i = 0; i < animFrames.length; i++) {
+        if (encError) throw encError;
+        btn.innerText = `Encoding ${i + 1}/${animFrames.length}...`;
+
         const L = getLayerById(animFrames[i]);
         tctx.fillStyle = '#ffffff';
         tctx.fillRect(0, 0, encW, encH);
         if (L) tctx.drawImage(L.canvas, 0, 0, encW, encH);
 
-        const frameBlob = await new Promise(r => tmp.toBlob(r, 'image/png'));
-        const frameArr  = new Uint8Array(await frameBlob.arrayBuffer());
-        // フレームを frame000.png, frame001.png ... の形式でFFmpegのFS上に書く
-        await ffmpeg.writeFile(`frame${String(i).padStart(4,'0')}.png`, frameArr);
+        const frame = new VideoFrame(tmp, {
+          timestamp:    i * frameDurationUs,
+          duration:     frameDurationUs,
+        });
+        // キーフレームは先頭と約1秒おきに挿入
+        const keyFrame = i === 0 || i % Math.max(1, Math.round(fpsVal)) === 0;
+        encoder.encode(frame, { keyFrame });
+        frame.close();
 
-        btn.innerText = `Encoding frames... ${i+1}/${animFrames.length}`;
+        // エンコードキューが詰まらないよう定期的にフラッシュ
+        if (i % 10 === 0) await encoder.flush();
       }
 
-      btn.innerText = "Muxing MP4...";
+      btn.innerText = "Muxing...";
+      await encoder.flush();
+      encoder.close();
+      muxer.finalize();
 
-      // H.264 / yuv420p でエンコード（Xが要求する最も互換性の高い設定）
-      await ffmpeg.exec([
-        '-framerate', String(fpsVal),
-        '-i', 'frame%04d.png',
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',   // Xが必須とするピクセルフォーマット
-        '-preset', 'fast',
-        '-crf', '23',            // 品質（低いほど高品質・重い）
-        '-movflags', '+faststart', // ストリーミング互換のためmoovをファイル先頭へ
-        '-vf', `scale=${encW}:${encH}`, // 偶数を確実に
-        'out.mp4'
-      ]);
+      if (encError) throw encError;
 
-      const outData = await ffmpeg.readFile('out.mp4');
-      const outBlob = new Blob([outData.buffer], { type: 'video/mp4' });
-
+      const outBlob = new Blob([target.buffer], { type: 'video/mp4' });
       let base = prompt('ファイル名を入力:', 'AnimX_Video');
       if (base === null) { btn.innerText = originalText; return; }
       base = base.trim() || 'AnimX_Video';
@@ -1297,12 +1306,12 @@ cInput.addEventListener('pointerdown', e => {
 
       redrawComposite();
       btn.innerText = originalText;
-      alert("MP4書き出し完了！\nH.264 / yuv420p で出力されました。Xにそのまま投稿できます。");
 
     } catch(err) {
       console.error(err);
-      alert("MP4エンコード失敗: " + err.message + "\n\nネットワーク接続を確認してください（FFmpeg.wasmのロードが必要です）。");
       btn.innerText = originalText;
+      alert('MP4エンコード失敗: ' + (err.message || err) + 
+            '\n\n考えられる原因:\n・iOS 15以下（WebCodecs非対応）\n・codec設定非対応の端末\n・ネットワークエラー（muxerロード失敗）');
     }
   }
   document.getElementById('btnExportAnimMP4').onclick = exportAnimationMP4;
