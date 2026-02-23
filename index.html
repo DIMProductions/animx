@@ -425,10 +425,10 @@
   });
 
   cInput.addEventListener('pointermove', e => {
-    if (!drawing || isPinching) return;
+    if (isPinching) return;
+    if (toolType === 'select') { if (selection.dragging) moveSelect(e); return; }
+    if (!drawing) return;
     const p = evPos(e, cInput);
-    if (toolType === 'select') { moveSelect(e); return; }
-    
     const raw = {x: p.x, y: p.y, p: e.pressure || 0.5};
     const k = (toolType === 'shadow') ? 0.3 : (1.0 - penSettings.smooth);
     const last = pts[pts.length-1];
