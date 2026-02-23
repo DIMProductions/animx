@@ -115,21 +115,26 @@
     .moveBtn{ font-size:8px; padding:2px 4px; border:1px solid var(--line); border-radius:4px; cursor:pointer; background:#222; color:#aaa; line-height:1; }
     .moveBtn:hover{ background:var(--accent); color:#000; }
   
-    .animThumbs{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+    .animThumbs{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; max-height:160px; overflow-y:auto; overflow-x:hidden; flex:0 0 auto; }
     .thumbItem{ border:1px solid var(--line); border-radius:10px; padding:6px; cursor:pointer; background:rgba(255,255,255,0.02); }
     .thumbItem:hover{ background:rgba(255,255,255,0.04); }
     .thumbImg{ width:100%; height:70px; background:#0a0d12; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
     .thumbImg img{ width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
     .thumbName{ margin-top:6px; font-size:11px; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .animSeq{ display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto; padding-right:4px; }
+    .animSeq{ display:flex; flex-direction:column; gap:6px; max-height:480px; overflow-y:auto; overflow-x:hidden; padding-right:4px; }
     .seqItem{ display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:10px; padding:6px; background:rgba(0,0,0,0.2); cursor:grab; }
     .seqItem.on{ outline:2px solid var(--accent); }
     .seqThumb{ width:52px; height:38px; border-radius:8px; overflow:hidden; background:#0a0d12; flex:0 0 auto; }
     .seqThumb img{ width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
     .seqLabel{ flex:1; font-size:11px; opacity:0.85; }
-    .seqBtns{ display:flex; gap:6px; }
-    .seqBtn{ font-size:11px; padding:4px 8px; border:1px solid var(--line); border-radius:10px; cursor:pointer; user-select:none; }
+    .seqBtns{ display:flex; flex-direction:column; gap:3px; flex:0 0 auto; }
+    .seqBtnsRow{ display:flex; gap:3px; }
+    .seqBtn{ font-size:11px; padding:3px 6px; border:1px solid var(--line); border-radius:8px; cursor:pointer; user-select:none; text-align:center; }
     .seqBtn:hover{ background:rgba(255,255,255,0.04); }
+    .seqFrameNum{ font-size:16px; font-weight:800; color:var(--accent); width:20px; text-align:center; flex:0 0 auto; opacity:0.85; }
+    .seqInfo{ flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; overflow:hidden; }
+    .seqLayerTag{ font-size:10px; color:var(--accent); font-weight:700; opacity:0.7; }
+    .seqLabel{ font-size:11px; opacity:0.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
     .modal-overlay {
       display: none; position: fixed; inset: 0; background: rgba(10, 13, 18, 0.8);
@@ -157,6 +162,11 @@
     .modal-body strong { color: var(--text); font-weight: 600; }
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .animSeq::-webkit-scrollbar { width: 4px; }
+    .animSeq::-webkit-scrollbar-track { background: #0e121a; border-radius: 4px; }
+    .animSeq::-webkit-scrollbar-thumb { background: #2a3140; border-radius: 4px; }
+    .animSeq::-webkit-scrollbar-thumb:hover { background: #00d0ff55; }
     @keyframes slideUp { from { transform: translateY(10px); } to { transform: translateY(0); } }
   </style>
 </head>
@@ -638,7 +648,43 @@
       el.querySelector('.eye').onclick=(e)=>{e.stopPropagation(); L.visible=!L.visible; updateLayerUI(); redrawComposite();};
       el.querySelector('.moveBtn.up').onclick=(e)=>{e.stopPropagation(); moveLayer(i, -1);};
       el.querySelector('.moveBtn.down').onclick=(e)=>{e.stopPropagation(); moveLayer(i, 1);};
-      el.onclick=()=>{activeIdx=i; updateLayerUI(); syncLayerOp();};
+      // クリックでレイヤー選択（lname以外）
+      el.onclick=(e)=>{
+        if(e.target.classList.contains('lname')) return; // リネーム中は選択しない
+        activeIdx=i; updateLayerUI(); syncLayerOp();
+      };
+
+      // ダブルクリック / 長押しでレイヤー名をインライン編集
+      const lnameEl = el.querySelector('.lname');
+      let clickTimer = null;
+      lnameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 既にアクティブなレイヤーへのクリックはダブルクリック判定
+        if (i === activeIdx) {
+          if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; startRename(e); }
+          else { clickTimer = setTimeout(() => { clickTimer = null; }, 400); }
+        } else {
+          activeIdx = i; updateLayerUI(); syncLayerOp();
+        }
+      });
+      const startRename = (e) => {
+        e.stopPropagation();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = L.name;
+        input.style.cssText = 'flex:1;font-size:12px;background:#0a0d12;color:#e8ecf2;border:1px solid #00d0ff;border-radius:4px;padding:1px 4px;outline:none;width:100%;';
+        lnameEl.replaceWith(input);
+        input.focus(); input.select();
+        const commit = () => { const v = input.value.trim(); if (v) L.name = v; updateLayerUI(); updateAnimUI(); };
+        input.onblur = commit;
+        input.onkeydown = (ev) => { if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=L.name; input.blur(); } ev.stopPropagation(); };
+      };
+      // iPad/iPhone: 長押し（500ms）
+      let pressTimer = null;
+      lnameEl.addEventListener('touchstart', (e) => { pressTimer = setTimeout(() => startRename(e), 500); }, { passive: true });
+      lnameEl.addEventListener('touchend',   () => clearTimeout(pressTimer), { passive: true });
+      lnameEl.addEventListener('touchmove',  () => clearTimeout(pressTimer), { passive: true });
+
       list.appendChild(el);
     });
     updateAnimUI(); ensureLayerSize(); redrawComposite();
@@ -1025,24 +1071,42 @@ cInput.addEventListener('pointerdown', e => {
   function updateAnimUI(){
     if(!elAnimThumbs || !elAnimSeq) return;
     elAnimThumbs.innerHTML='';
-    layers.forEach((L)=>{
+    layers.forEach((L, li)=>{
       const item=document.createElement('div'); item.className='thumbItem'; const src = layerThumbURL(L);
-      item.innerHTML = `<div class="thumbImg"><img draggable="false" src="${src}"></div><div class="thumbName">${L.name}</div>`;
+      const lnum = layers.length - li;
+      item.innerHTML = `<div class="thumbImg"><img draggable="false" src="${src}"></div><div class="thumbName">L${lnum} ${L.name}</div>`;
       item.onclick=()=>{ animFrames.push(L.id); activeAnimIdx = animFrames.length-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
       elAnimThumbs.appendChild(item);
     });
 
     elAnimSeq.innerHTML='';
     animFrames.forEach((layerId, idx)=>{
-      const L=getLayerById(layerId); const item=document.createElement('div');
+      const L=getLayerById(layerId);
+      const layerIdx = layers.findIndex(l => l.id === layerId);
+      const item=document.createElement('div');
       item.className = `seqItem ${idx===activeAnimIdx?'on':''}`; item.draggable = true;
-      const src = L ? layerThumbURL(L) : ''; const label = L ? L.name : '(missing layer)';
+      const src = L ? layerThumbURL(L) : '';
+      const label = L ? L.name : '(missing)';
+      const layerTag = layerIdx >= 0 ? `L${layers.length - layerIdx}` : '?';
       item.innerHTML = `
-        <div class="seqThumb">${src?`<img draggable="false" src="${src}">`:''}</div>
-        <div class="seqLabel">${idx+1}. ${label}</div>
-        <div class="seqBtns"><div class="seqBtn" data-act="dup">Copy</div><div class="seqBtn" data-act="del">Del</div></div>
+        <div class="seqFrameNum">${idx+1}</div>
+        <div class="seqThumb" style="width:64px;height:48px;">${src?`<img draggable="false" src="${src}">`:''}</div>
+        <div class="seqInfo">
+          <div class="seqLayerTag">${layerTag}</div>
+          <div class="seqLabel">${label}</div>
+        </div>
+        <div class="seqBtns">
+          <div class="moveBtn up" data-act="up">▲</div>
+          <div class="moveBtn down" data-act="down">▼</div>
+          <div class="seqBtnsRow">
+            <div class="seqBtn" data-act="dup">C</div>
+            <div class="seqBtn" data-act="del">D</div>
+          </div>
+        </div>
       `;
       item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="up"]').onclick=(e)=>{ e.stopPropagation(); if(idx===0) return; const [m]=animFrames.splice(idx,1); animFrames.splice(idx-1,0,m); activeAnimIdx=idx-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="down"]').onclick=(e)=>{ e.stopPropagation(); if(idx>=animFrames.length-1) return; const [m]=animFrames.splice(idx,1); animFrames.splice(idx+1,0,m); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
       item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
       item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
       item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
