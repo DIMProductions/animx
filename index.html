@@ -281,11 +281,9 @@
 
       <div id="grp-resize" style="display:none;">
         <div class="sep"></div>
-        <h3>RESIZE SELECTION</h3>
-        <label>W <span id="vSelW">0</span>px</label>
-        <input id="selW" type="range" min="1" max="800" value="100" step="1">
-        <label>H <span id="vSelH">0</span>px</label>
-        <input id="selH" type="range" min="1" max="800" value="100" step="1">
+        <h3>SCALE SELECTION</h3>
+        <label>Scale <span id="vSelScale">100</span>%</label>
+        <input id="selScale" type="range" min="10" max="400" value="100" step="1">
         <div class="row" style="margin-top:6px;">
           <div class="btn small accent" id="btnApplyResize">Apply</div>
           <div class="btn small" id="btnResetResize">Reset</div>
@@ -494,7 +492,7 @@
   let lastPointer = {x:0, y:0};
 
   // 選択・クリップボード変数
-  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, _srcCanvas:null, _dataVersion:0 };
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, scale:1, _srcCanvas:null, _dataVersion:0 };
   let selectionPointerId = null;
   let dragMode = 'move';
   let __clipboard = null;
@@ -819,14 +817,14 @@
   document.getElementById('toolSelect').onclick=()=>setTool('select');
   document.getElementById('btnApplyResize').onclick=()=>applyResize();
   document.getElementById('btnResetResize').onclick=()=>resetResize();
-  document.getElementById('selW').oninput=(e)=>{ 
-    document.getElementById('vSelW').textContent=Math.round(e.target.value);
-    selection.resizeW = Math.round(Number(e.target.value));
-    redrawComposite();
-  };
-  document.getElementById('selH').oninput=(e)=>{ 
-    document.getElementById('vSelH').textContent=Math.round(e.target.value);
-    selection.resizeH = Math.round(Number(e.target.value));
+  document.getElementById('selScale').oninput=(e)=>{ 
+    const pct = Number(e.target.value);
+    document.getElementById('vSelScale').textContent = pct;
+    selection.scale = pct / 100;
+    if(selection.img){
+      selection.resizeW = Math.max(1, Math.round(selection.img.width * selection.scale));
+      selection.resizeH = Math.max(1, Math.round(selection.img.height * selection.scale));
+    }
     redrawComposite();
   };
 
@@ -925,47 +923,38 @@
     const grp = document.getElementById('grp-resize');
     if(!selection.active || !selection.img){ grp.style.display='none'; return; }
     grp.style.display='block';
-    const w = selection.resizeW || selection.w;
-    const h = selection.resizeH || selection.h;
-    const slW = document.getElementById('selW');
-    const slH = document.getElementById('selH');
-    slW.max = cComp.width; slH.max = cComp.height;
-    slW.value = w; document.getElementById('vSelW').textContent = Math.round(w);
-    slH.value = h; document.getElementById('vSelH').textContent = Math.round(h);
+    selection.scale = 1;
+    document.getElementById('selScale').value = 100;
+    document.getElementById('vSelScale').textContent = '100';
   }
 
   function applyResize(){
     if(!selection.active || !selection.img) return;
-    const newW = Math.max(1, Math.round(Number(document.getElementById('selW').value)));
-    const newH = Math.max(1, Math.round(Number(document.getElementById('selH').value)));
-    // 一時キャンバスで拡縮
+    const scale = selection.scale || 1;
+    const newW = Math.max(1, Math.round(selection.img.width * scale));
+    const newH = Math.max(1, Math.round(selection.img.height * scale));
     const tmp = document.createElement('canvas'); tmp.width = newW; tmp.height = newH;
-    const tctx = tmp.getContext('2d');
-    // ImageData → canvas に変換してから drawImage でリサイズ
-    const srcC = document.createElement('canvas'); srcC.width = selection.img.width; srcC.height = selection.img.height;
-    srcC.getContext('2d').putImageData(selection.img, 0, 0);
-    tctx.drawImage(srcC, 0, 0, newW, newH);
-    // 元レイヤーをクリアして焼き込み
+    if(!selection._srcCanvas){ const sc = document.createElement('canvas'); sc.width=selection.img.width; sc.height=selection.img.height; sc.getContext('2d').putImageData(selection.img,0,0); selection._srcCanvas=sc; }
+    tmp.getContext('2d').drawImage(selection._srcCanvas, 0, 0, newW, newH);
     const ctx = layers[activeIdx].ctx;
     const before = snapshotLayer(activeIdx);
     const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: selection.img.width, h: selection.img.height };
     if(dragMode === 'move') ctx.clearRect(orig.x, orig.y, orig.w, orig.h);
     ctx.drawImage(tmp, Math.round(selection.x), Math.round(selection.y));
     const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
-    // 選択状態を更新
     selection.img = ctx.getImageData(Math.round(selection.x), Math.round(selection.y), newW, newH);
     selection.w = newW; selection.h = newH;
     selection.resizeW = newW; selection.resizeH = newH;
+    selection.scale = 1; selection._srcCanvas = null; selection._dataVersion = (selection._dataVersion||0)+1;
     selection.origin = { x: Math.round(selection.x), y: Math.round(selection.y), w: newW, h: newH };
-    redrawComposite();
+    redrawComposite(); showResizePanel();
   }
 
   function resetResize(){
     if(!selection.active || !selection.img) return;
+    selection.scale = 1;
     selection.resizeW = selection.img.width;
     selection.resizeH = selection.img.height;
-    selection.w = selection.img.width;
-    selection.h = selection.img.height;
     showResizePanel();
     redrawComposite();
   }
