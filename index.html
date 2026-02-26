@@ -748,8 +748,12 @@
           sc.getContext('2d').putImageData(selection.img, 0, 0);
           selection._srcCanvas = sc; selection._srcCanvas._dataVersion = selection._dataVersion;
         }
+        // 中央支点：元の中心を維持してリサイズ
+        const origW = selection.img.width, origH = selection.img.height;
+        const cx = nx + origW / 2, cy = ny + origH / 2;
+        const px = cx - nw / 2, py = cy - nh / 2;
         gComp.globalAlpha = 0.9;
-        gComp.drawImage(selection._srcCanvas, nx, ny, nw, nh);
+        gComp.drawImage(selection._srcCanvas, px, py, nw, nh);
       }
       gComp.restore();
     }
@@ -939,14 +943,20 @@
     const ctx = layers[activeIdx].ctx;
     const before = snapshotLayer(activeIdx);
     const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: selection.img.width, h: selection.img.height };
+    // 中央支点：元の選択範囲の中心を維持
+    const origCx = orig.x + orig.w / 2;
+    const origCy = orig.y + orig.h / 2;
+    const drawX = Math.round(origCx - newW / 2);
+    const drawY = Math.round(origCy - newH / 2);
     if(dragMode === 'move') ctx.clearRect(orig.x, orig.y, orig.w, orig.h);
-    ctx.drawImage(tmp, Math.round(selection.x), Math.round(selection.y));
+    ctx.drawImage(tmp, drawX, drawY);
     const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
-    selection.img = ctx.getImageData(Math.round(selection.x), Math.round(selection.y), newW, newH);
+    selection.x = drawX; selection.y = drawY;
+    selection.img = ctx.getImageData(drawX, drawY, newW, newH);
     selection.w = newW; selection.h = newH;
     selection.resizeW = newW; selection.resizeH = newH;
     selection.scale = 1; selection._srcCanvas = null; selection._dataVersion = (selection._dataVersion||0)+1;
-    selection.origin = { x: Math.round(selection.x), y: Math.round(selection.y), w: newW, h: newH };
+    selection.origin = { x: drawX, y: drawY, w: newW, h: newH };
     redrawComposite(); showResizePanel();
   }
 
