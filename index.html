@@ -66,7 +66,33 @@
     .sep{ height:1px; background:#222a38; margin:6px 0; }
 
     label{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
-    input[type="range"]{ width:100%; margin:4px 0; }
+    input[type="range"]{
+      width:100%; margin:4px 0;
+      -webkit-appearance:none; appearance:none;
+      height:4px; border-radius:4px;
+      background:#2a3140; outline:none; cursor:pointer;
+      border:none; padding:0;
+    }
+    input[type="range"]::-webkit-slider-container{ background:transparent; }
+    input[type="range"]::-webkit-slider-runnable-track{
+      -webkit-appearance:none; appearance:none;
+      height:4px; border-radius:4px;
+      background:#2a3140; border:none;
+    }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none; appearance:none;
+      width:16px; height:16px; border-radius:50%; margin-top:-6px;
+      background:#00d0ff; cursor:pointer; border:none;
+      box-shadow:0 0 4px rgba(0,208,255,0.5);
+    }
+    input[type="range"]::-moz-range-track{
+      height:4px; border-radius:4px;
+      background:#2a3140; border:none;
+    }
+    input[type="range"]::-moz-range-thumb{
+      width:16px; height:16px; border-radius:50%; border:none;
+      background:#00d0ff; cursor:pointer;
+    }
 
     .toggle { appearance:none; width:28px; height:16px; background:#222; border-radius:10px; border:1px solid #444; position:relative; outline:none; cursor:pointer; vertical-align:middle; }
     .toggle::after { content:''; position:absolute; top:1px; left:1px; width:12px; height:12px; background:#666; border-radius:50%; transition:0.2s; }
@@ -163,10 +189,10 @@
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .animSeq::-webkit-scrollbar { width: 4px; }
-    .animSeq::-webkit-scrollbar-track { background: #0e121a; border-radius: 4px; }
-    .animSeq::-webkit-scrollbar-thumb { background: #2a3140; border-radius: 4px; }
-    .animSeq::-webkit-scrollbar-thumb:hover { background: #00d0ff55; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #0e121a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #2a3140; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00d0ff55; }
     @keyframes slideUp { from { transform: translateY(10px); } to { transform: translateY(0); } }
   </style>
 </head>
@@ -251,6 +277,19 @@
       <div class="row" style="margin-top:8px;">
           <div class="btn small active" id="dragModeMove">Drag: Move</div>
           <div class="btn small" id="dragModeCopy">Drag: Copy</div>
+      </div>
+
+      <div id="grp-resize" style="display:none;">
+        <div class="sep"></div>
+        <h3>RESIZE SELECTION</h3>
+        <label>W <span id="vSelW">0</span>px</label>
+        <input id="selW" type="range" min="1" max="800" value="100" step="1">
+        <label>H <span id="vSelH">0</span>px</label>
+        <input id="selH" type="range" min="1" max="800" value="100" step="1">
+        <div class="row" style="margin-top:6px;">
+          <div class="btn small accent" id="btnApplyResize">Apply</div>
+          <div class="btn small" id="btnResetResize">Reset</div>
+        </div>
       </div>
 
       <div class="sep"></div>
@@ -455,7 +494,7 @@
   let lastPointer = {x:0, y:0};
 
   // 選択・クリップボード変数
-  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null };
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, _srcCanvas:null, _dataVersion:0 };
   let selectionPointerId = null;
   let dragMode = 'move';
   let __clipboard = null;
@@ -696,12 +735,24 @@
     if(currentTab==='draw' && toolType==='select' && selection.active){
       const nx = Math.min(selection.x, selection.x + selection.w);
       const ny = Math.min(selection.y, selection.y + selection.h);
-      const nw = Math.abs(selection.w), nh = Math.abs(selection.h);
+      // imgがある（選択確定済み）場合のみresizeW/Hを使う。ドラッグ中は実際のw/hを使う
+      const nw = (selection.img && selection.resizeW) ? selection.resizeW : Math.abs(selection.w);
+      const nh = (selection.img && selection.resizeH) ? selection.resizeH : Math.abs(selection.h);
       gComp.save(); gComp.globalAlpha = 1.0; gComp.setLineDash([6,4]); gComp.lineWidth = 2;
       gComp.strokeStyle = 'rgba(0,0,0,0.85)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
       gComp.lineWidth = 1; gComp.strokeStyle = 'rgba(0,208,255,0.95)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
       gComp.setLineDash([]);
-      if(selection.moving && selection.img){ gComp.globalAlpha = 0.85; gComp.putImageData(selection.img, nx, ny); }
+      if(selection.img){
+        // imgをcanvasに変換してdrawImageでリサイズプレビュー
+        if(!selection._srcCanvas || selection._srcCanvas._dataVersion !== selection._dataVersion){
+          const sc = document.createElement('canvas');
+          sc.width = selection.img.width; sc.height = selection.img.height;
+          sc.getContext('2d').putImageData(selection.img, 0, 0);
+          selection._srcCanvas = sc; selection._srcCanvas._dataVersion = selection._dataVersion;
+        }
+        gComp.globalAlpha = 0.9;
+        gComp.drawImage(selection._srcCanvas, nx, ny, nw, nh);
+      }
       gComp.restore();
     }
   }
@@ -759,12 +810,25 @@
     if(t === 'pen' || t === 'eraser') { panel.classList.add('show-gpen'); panel.classList.remove('show-shadow'); }
     else if(t === 'shadow') { panel.classList.remove('show-gpen'); panel.classList.add('show-shadow'); }
     else { panel.classList.remove('show-gpen'); panel.classList.remove('show-shadow'); }
+    if(t !== 'select'){ selection.active = false; selection.img = null; document.getElementById('grp-resize').style.display='none'; }
     redrawComposite();
   }
   document.getElementById('toolPen').onclick=()=>setTool('pen');
   document.getElementById('toolShadow').onclick=()=>setTool('shadow');
   document.getElementById('toolEraser').onclick=()=>setTool('eraser');
   document.getElementById('toolSelect').onclick=()=>setTool('select');
+  document.getElementById('btnApplyResize').onclick=()=>applyResize();
+  document.getElementById('btnResetResize').onclick=()=>resetResize();
+  document.getElementById('selW').oninput=(e)=>{ 
+    document.getElementById('vSelW').textContent=Math.round(e.target.value);
+    selection.resizeW = Math.round(Number(e.target.value));
+    redrawComposite();
+  };
+  document.getElementById('selH').oninput=(e)=>{ 
+    document.getElementById('vSelH').textContent=Math.round(e.target.value);
+    selection.resizeH = Math.round(Number(e.target.value));
+    redrawComposite();
+  };
 
   const bindSet = (id, key, dispId, obj=penSettings) => { document.getElementById(id).oninput=(e)=>{ obj[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = obj[key]; }; };
   bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); 
@@ -837,7 +901,8 @@
       if(r.w < 2 || r.h < 2){ selection.active = false; selection.img = null; redrawComposite(); return; }
       selection.x = r.x; selection.y = r.y; selection.w = r.w; selection.h = r.h;
       try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
-      redrawComposite(); return;
+      selection.resizeW = r.w; selection.resizeH = r.h; selection._dataVersion = (selection._dataVersion||0)+1;
+      redrawComposite(); showResizePanel(); return;
     }
     selection.moving = false;
     if(!selection.img){ try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; } }
@@ -851,6 +916,57 @@
     const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
     selection.x = nx; selection.y = ny; selection.w = selection.img.width; selection.h = selection.img.height;
     selection.origin = { x:nx, y:ny, w:selection.img.width, h:selection.img.height };
+    selection.resizeW = selection.img.width; selection.resizeH = selection.img.height;
+    redrawComposite(); showResizePanel();
+  }
+
+  // リサイズパネルの表示・更新
+  function showResizePanel(){
+    const grp = document.getElementById('grp-resize');
+    if(!selection.active || !selection.img){ grp.style.display='none'; return; }
+    grp.style.display='block';
+    const w = selection.resizeW || selection.w;
+    const h = selection.resizeH || selection.h;
+    const slW = document.getElementById('selW');
+    const slH = document.getElementById('selH');
+    slW.max = cComp.width; slH.max = cComp.height;
+    slW.value = w; document.getElementById('vSelW').textContent = Math.round(w);
+    slH.value = h; document.getElementById('vSelH').textContent = Math.round(h);
+  }
+
+  function applyResize(){
+    if(!selection.active || !selection.img) return;
+    const newW = Math.max(1, Math.round(Number(document.getElementById('selW').value)));
+    const newH = Math.max(1, Math.round(Number(document.getElementById('selH').value)));
+    // 一時キャンバスで拡縮
+    const tmp = document.createElement('canvas'); tmp.width = newW; tmp.height = newH;
+    const tctx = tmp.getContext('2d');
+    // ImageData → canvas に変換してから drawImage でリサイズ
+    const srcC = document.createElement('canvas'); srcC.width = selection.img.width; srcC.height = selection.img.height;
+    srcC.getContext('2d').putImageData(selection.img, 0, 0);
+    tctx.drawImage(srcC, 0, 0, newW, newH);
+    // 元レイヤーをクリアして焼き込み
+    const ctx = layers[activeIdx].ctx;
+    const before = snapshotLayer(activeIdx);
+    const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: selection.img.width, h: selection.img.height };
+    if(dragMode === 'move') ctx.clearRect(orig.x, orig.y, orig.w, orig.h);
+    ctx.drawImage(tmp, Math.round(selection.x), Math.round(selection.y));
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
+    // 選択状態を更新
+    selection.img = ctx.getImageData(Math.round(selection.x), Math.round(selection.y), newW, newH);
+    selection.w = newW; selection.h = newH;
+    selection.resizeW = newW; selection.resizeH = newH;
+    selection.origin = { x: Math.round(selection.x), y: Math.round(selection.y), w: newW, h: newH };
+    redrawComposite();
+  }
+
+  function resetResize(){
+    if(!selection.active || !selection.img) return;
+    selection.resizeW = selection.img.width;
+    selection.resizeH = selection.img.height;
+    selection.w = selection.img.width;
+    selection.h = selection.img.height;
+    showResizePanel();
     redrawComposite();
   }
 
