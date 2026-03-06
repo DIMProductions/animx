@@ -6,7 +6,6 @@
   <title>AnimX</title>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#001a33">
-  <link rel="icon" href="/assets/apple-touch-icon.png" type="image/png">
   <style>
     :root{
       --bg:#0f1115; --ui:#151a22; --ui2:#10141c; --line:#2a3140;
@@ -317,7 +316,7 @@
       </div>
 
       <div class="sep"></div>
-      <h3>REFERENCE (3D) <input type="checkbox" id="refToggle" class="toggle" checked title="Toggle Reference ON/OFF"></h3>
+      <h3>Face Guide (3D) <input type="checkbox" id="refToggle" class="toggle" checked title="Toggle Reference ON/OFF"></h3>
       <label>Yaw (Rotate) <span id="vYaw">0°</span></label>
       <input id="traceYaw" type="range" min="-2" max="2" step="1" value="0">
       <label>Pitch (Tilt) <span id="vPitch">0°</span></label>
@@ -381,7 +380,7 @@
       <div class="btn small" id="btnDupLayer">Copy</div>
       <div class="btn danger small" id="btnDelLayer">Del</div>
     </div>
-    <label>Opacity <span id="vLayerOp">1.0</span></label>
+    <label>Onion Skin <span id="vLayerOp">1.0</span></label>
     <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
     <div class="sep"></div>
     <div class="layersList" id="layersList"></div>
