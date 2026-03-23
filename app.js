@@ -72,7 +72,7 @@
   let lastPointer = {x:0, y:0};
 
   // 選択・クリップボード変数
-  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, scale:1, _srcCanvas:null, _dataVersion:0 };
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, scale:1, angle:0, _srcCanvas:null, _dataVersion:0 };
   let selectionPointerId = null;
   let dragMode = 'move';
   let __clipboard = null;
@@ -247,15 +247,27 @@
   function redrawComposite(){
     gComp.clearRect(0,0,cComp.width,cComp.height);
     for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
+// redrawComposite 内の選択範囲プレビュー部分を丸ごとこれに差し替え
     if(currentTab==='draw' && toolType==='select' && selection.active){
       const nx = Math.min(selection.x, selection.x + selection.w);
       const ny = Math.min(selection.y, selection.y + selection.h);
       const nw = (selection.img && selection.resizeW) ? selection.resizeW : Math.abs(selection.w);
       const nh = (selection.img && selection.resizeH) ? selection.resizeH : Math.abs(selection.h);
-      gComp.save(); gComp.globalAlpha = 1.0; gComp.setLineDash([6,4]); gComp.lineWidth = 2;
-      gComp.strokeStyle = 'rgba(0,0,0,0.85)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
-      gComp.lineWidth = 1; gComp.strokeStyle = 'rgba(0,208,255,0.95)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      
+      const cx = nx + nw / 2;
+      const cy = ny + nh / 2;
+
+      gComp.save(); 
+      gComp.translate(cx, cy); // 中心点に移動
+      if(selection.img && selection.angle) {
+         gComp.rotate(selection.angle * Math.PI / 180); // 回転
+      }
+
+      gComp.globalAlpha = 1.0; gComp.setLineDash([6,4]); gComp.lineWidth = 2;
+      gComp.strokeStyle = 'rgba(0,0,0,0.85)'; gComp.strokeRect(-nw/2, -nh/2, nw, nh);
+      gComp.lineWidth = 1; gComp.strokeStyle = 'rgba(0,208,255,0.95)'; gComp.strokeRect(-nw/2, -nh/2, nw, nh);
       gComp.setLineDash([]);
+
       if(selection.img){
         if(!selection._srcCanvas || selection._srcCanvas._dataVersion !== selection._dataVersion){
           const sc = document.createElement('canvas');
@@ -263,11 +275,8 @@
           sc.getContext('2d').putImageData(selection.img, 0, 0);
           selection._srcCanvas = sc; selection._srcCanvas._dataVersion = selection._dataVersion;
         }
-        const origW = selection.img.width, origH = selection.img.height;
-        const cx = nx + origW / 2, cy = ny + origH / 2;
-        const px = cx - nw / 2, py = cy - nh / 2;
         gComp.globalAlpha = 0.9;
-        gComp.drawImage(selection._srcCanvas, px, py, nw, nh);
+        gComp.drawImage(selection._srcCanvas, -nw/2, -nh/2, nw, nh);
       }
       gComp.restore();
     }
@@ -350,6 +359,14 @@
       selection.resizeW = Math.max(1, Math.round(selection.img.width * selection.scale));
       selection.resizeH = Math.max(1, Math.round(selection.img.height * selection.scale));
     }
+    redrawComposite();
+  };
+
+  // ★これを追加
+  document.getElementById('selAngle').oninput=(e)=>{ 
+    const deg = Number(e.target.value);
+    document.getElementById('vSelAngle').textContent = deg;
+    selection.angle = deg;
     redrawComposite();
   };
 
@@ -449,41 +466,72 @@
     if(!selection.active || !selection.img){ grp.style.display='none'; return; }
     grp.style.display='block';
     selection.scale = 1;
+    selection.angle = 0; // 初期化
     document.getElementById('selScale').value = 100;
     document.getElementById('vSelScale').textContent = '100';
+    document.getElementById('selAngle').value = 0;
+    document.getElementById('vSelAngle').textContent = '0';
   }
 
   function applyResize(){
-    // ★ リサイズ時のガード
     if(!selection.active || !selection.img || !layers[activeIdx] || layers[activeIdx].locked) return;
     const scale = selection.scale || 1;
-    const newW = Math.max(1, Math.round(selection.img.width * scale));
-    const newH = Math.max(1, Math.round(selection.img.height * scale));
+    const angle = selection.angle || 0;
+    
+    const rad = angle * Math.PI / 180;
+    const origW = selection.img.width;
+    const origH = selection.img.height;
+    const scaledW = origW * scale;
+    const scaledH = origH * scale;
+
+    // 回転後の新しいバウンディングボックスのサイズを計算
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const newW = Math.max(1, Math.round(scaledW * cos + scaledH * sin));
+    const newH = Math.max(1, Math.round(scaledW * sin + scaledH * cos));
+
     const tmp = document.createElement('canvas'); tmp.width = newW; tmp.height = newH;
-    if(!selection._srcCanvas){ const sc = document.createElement('canvas'); sc.width=selection.img.width; sc.height=selection.img.height; sc.getContext('2d').putImageData(selection.img,0,0); selection._srcCanvas=sc; }
-    tmp.getContext('2d').drawImage(selection._srcCanvas, 0, 0, newW, newH);
+    const tctx = tmp.getContext('2d');
+
+    if(!selection._srcCanvas){ 
+        const sc = document.createElement('canvas'); sc.width=origW; sc.height=origH; 
+        sc.getContext('2d').putImageData(selection.img,0,0); selection._srcCanvas=sc; 
+    }
+
+    // 中心を基準に回転して描画
+    tctx.translate(newW/2, newH/2);
+    tctx.rotate(rad);
+    tctx.drawImage(selection._srcCanvas, -scaledW/2, -scaledH/2, scaledW, scaledH);
+
     const ctx = layers[activeIdx].ctx;
     const before = snapshotLayer(activeIdx);
-    const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: selection.img.width, h: selection.img.height };
+    const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: origW, h: origH };
+    
     const origCx = orig.x + orig.w / 2;
     const origCy = orig.y + orig.h / 2;
     const drawX = Math.round(origCx - newW / 2);
     const drawY = Math.round(origCy - newH / 2);
+
     if(dragMode === 'move') ctx.clearRect(orig.x, orig.y, orig.w, orig.h);
     ctx.drawImage(tmp, drawX, drawY);
+    
     const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
+    
     selection.x = drawX; selection.y = drawY;
     selection.img = ctx.getImageData(drawX, drawY, newW, newH);
     selection.w = newW; selection.h = newH;
     selection.resizeW = newW; selection.resizeH = newH;
-    selection.scale = 1; selection._srcCanvas = null; selection._dataVersion = (selection._dataVersion||0)+1;
+    selection.scale = 1; selection.angle = 0; // 変形をリセット
+    selection._srcCanvas = null; selection._dataVersion = (selection._dataVersion||0)+1;
     selection.origin = { x: drawX, y: drawY, w: newW, h: newH };
+    
     redrawComposite(); showResizePanel();
   }
 
   function resetResize(){
     if(!selection.active || !selection.img) return;
     selection.scale = 1;
+    selection.angle = 0; // 追加
     selection.resizeW = selection.img.width;
     selection.resizeH = selection.img.height;
     showResizePanel();

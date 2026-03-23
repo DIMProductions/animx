@@ -92,9 +92,13 @@
 
       <div id="grp-resize" style="display:none;">
         <div class="sep"></div>
-        <h3>SCALE SELECTION</h3>
+        <h3>TRANSFORM SELECTION</h3>
         <label>Scale <span id="vSelScale">100</span>%</label>
         <input id="selScale" type="range" min="10" max="400" value="100" step="1">
+        
+        <label>Rotation <span id="vSelAngle">0</span>°</label>
+        <input id="selAngle" type="range" min="-180" max="180" value="0" step="1">
+
         <div class="row" style="margin-top:6px;">
           <div class="btn small accent" id="btnApplyResize">Apply</div>
           <div class="btn small" id="btnResetResize">Reset</div>
