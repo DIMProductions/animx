@@ -535,8 +535,13 @@
     drawPreview(gInput, pts);
   });
 
+// ==========================================
+  // プロクリエイト風: 筆圧＋ベジェ曲線のハイブリッド描画
+  // ==========================================
   function drawStroke(ctx, points){
     if(points.length<2) return; 
+    
+    // シャドウブラシの処理（変更なし）
     if(toolType === 'shadow'){
         const stampSize = penSettings.size * 2; 
         const stamp = makeWatercolorStamp(stampSize, shadowSettings.wet, shadowSettings.grain, shadowSettings.edgeDark);
@@ -563,25 +568,71 @@
     const {lens, total} = getStrokeLengths(points);
     const strength = (toolType === 'eraser') ? 2.4 : 1.0;
     ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
+
+    // 消しゴムのベジェ曲線化
     if(toolType === 'eraser'){
         ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
-        for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        if (points.length < 3) {
+           ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+        } else {
+           for(let i=1; i<points.length-1; i++){
+               const xc = (points[i].x + points[i+1].x)/2;
+               const yc = (points[i].y + points[i+1].y)/2;
+               ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+           }
+           ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+        }
         ctx.lineWidth = penSettings.size; ctx.stroke(); return;
     }
-    for(let i=1; i<points.length; i++){
-      const t0 = lens[i-1]/total, t1 = lens[i]/total;
-      const w0 = getWidthAt(t0, points[i-1].p, penSettings), w1 = getWidthAt(t1, points[i].p, penSettings);
-      ctx.beginPath(); ctx.moveTo(points[i-1].x, points[i-1].y); ctx.lineTo(points[i].x, points[i].y);
-      ctx.lineWidth = ((w0+w1)*0.5) * strength; ctx.strokeStyle = '#000'; ctx.stroke();
-      ctx.beginPath(); ctx.arc(points[i].x, points[i].y, w1/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
+
+    // Gペンのベジェ曲線化（太さの動的変化対応）
+    if(points.length < 3){
+      const w = getWidthAt(1, points[1].p, penSettings) * strength;
+      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y);
+      ctx.lineWidth = w; ctx.strokeStyle = '#000'; ctx.stroke(); return;
     }
+
+    let midPrev = { x: (points[0].x + points[1].x)/2, y: (points[0].y + points[1].y)/2 };
+    ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(midPrev.x, midPrev.y);
+    ctx.lineWidth = getWidthAt(0, points[0].p, penSettings) * strength; ctx.strokeStyle = '#000'; ctx.stroke();
+
+    for(let i=1; i<points.length-1; i++){
+      const midNext = { x: (points[i].x + points[i+1].x)/2, y: (points[i].y + points[i+1].y)/2 };
+      const t = lens[i]/total;
+      const w = getWidthAt(t, points[i].p, penSettings) * strength;
+
+      // 各セグメントごとに太さを変えながらベジェ曲線を引く
+      ctx.beginPath();
+      ctx.moveTo(midPrev.x, midPrev.y);
+      ctx.quadraticCurveTo(points[i].x, points[i].y, midNext.x, midNext.y);
+      ctx.lineWidth = w; ctx.strokeStyle = '#000'; ctx.stroke();
+
+      // 関節部分の隙間を埋める
+      ctx.beginPath(); ctx.arc(midNext.x, midNext.y, w/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
+
+      midPrev = midNext;
+    }
+    
+    const last = points[points.length-1];
+    const wLast = getWidthAt(1, last.p, penSettings) * strength;
+    ctx.beginPath(); ctx.moveTo(midPrev.x, midPrev.y); ctx.lineTo(last.x, last.y);
+    ctx.lineWidth = wLast; ctx.stroke();
   }
 
   function drawPreview(ctx, points){
     ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); if(points.length<2) return;
     if(toolType==='eraser'){
       ctx.strokeStyle = '#ffcccc'; ctx.globalAlpha=0.5; ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y); for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.moveTo(points[0].x, points[0].y); 
+      if(points.length<3){
+         ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+      }else{
+         for(let i=1;i<points.length-1;i++){
+           const xc=(points[i].x+points[i+1].x)/2, yc=(points[i].y+points[i+1].y)/2;
+           ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+         }
+         ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+      }
       ctx.lineWidth = penSettings.size; ctx.stroke();
     } else if(toolType === 'shadow'){
       ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = penSettings.size; 
