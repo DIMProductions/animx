@@ -193,6 +193,12 @@
     ::-webkit-scrollbar-thumb { background: #2a3140; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #00d0ff55; }
     @keyframes slideUp { from { transform: translateY(10px); } to { transform: translateY(0); } }
+    canvas {
+  -webkit-touch-callout: none; 
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+}
   </style>
 </head>
 
@@ -1515,6 +1521,11 @@ cInput.addEventListener('pointerdown', e => {
   window.addEventListener('load', resizeCanvasBase);
   addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
 })();
+
+// 右クリックメニュー（長押しメニュー）を強制的に出さない
+cInput.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
 </script>
 </body>
 </html>
