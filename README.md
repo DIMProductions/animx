@@ -138,6 +138,8 @@ Supports Wacom / Huion / XP-Pen tablets via Windows Ink or Pointer Events.
 ```
 animx/
   ├── index.html        # The complete application (Single File)
+  ├── app.js
+  ├── style.css 
   ├── source/           # Icons, logos, and reference assets
   │    ├── dimplogo.svg
   │    └── loomis_source.svg
