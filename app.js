@@ -1,0 +1,1044 @@
+(() => {
+  // ==========================================
+  // 1. 変数の初期化とDOMの取得 (ここで全て宣言)
+  // ==========================================
+  const tabs = document.querySelectorAll('.tab');
+  const slots = { draw:document.getElementById('slot-draw'), export:document.getElementById('slot-export'), anim:document.getElementById('slot-anim') };
+  const refContainer = document.getElementById('refContainer'); 
+  const stage = document.getElementById('stage');
+  const cComp = document.getElementById('composite');
+  const cInput = document.getElementById('input');
+  const gComp = cComp.getContext('2d');
+  const gInput = cInput.getContext('2d', {willReadFrequently:true});
+  const stageContainer = document.querySelector('.stageContainer');
+  const elZoom = document.getElementById('canvasZoom');
+  const vZoom = document.getElementById('vCanvasZoom');
+  const elScaleTarget = document.getElementById('canvasScaleTarget');
+
+  let currentTab = 'draw';
+  let baseW = 800, baseH = 600;
+  let currentScale = 1.0;
+
+  // ---- 統合インタラクションエンジン（ズーム・描画・ピンチ分離） ----
+  let isPinching = false;
+  let initialPinchDist = null;
+  let initialScale = 1.0;
+
+  // 1. マウスホイールでのズーム（PC用）
+  stageContainer.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY * -0.001;
+    let nextScale = Math.max(0.1, Math.min(4, currentScale + delta));
+    const rect = stageContainer.getBoundingClientRect();
+    zoomToPoint(nextScale, e.clientX - rect.left, e.clientY - rect.top);
+    elZoom.value = Math.round(nextScale * 100); vZoom.innerText = elZoom.value + '%';
+  }, { passive: false });
+
+  // 2. iPad ピンチズーム（2本指操作）
+  stageContainer.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      isPinching = true;
+      drawing = false; 
+      gInput.clearRect(0, 0, baseW, baseH); pts = []; 
+      initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      initialScale = currentScale;
+    }
+  }, { passive: false });
+
+  stageContainer.addEventListener('touchmove', e => {
+    if (e.touches.length >= 2 && initialPinchDist) {
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      let nextScale = Math.max(0.1, Math.min(4, initialScale * (d / initialPinchDist)));
+      const rect = stageContainer.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      zoomToPoint(nextScale, cx, cy);
+      elZoom.value = Math.round(nextScale * 100); vZoom.innerText = elZoom.value + '%';
+    }
+  }, { passive: false });
+
+  stageContainer.addEventListener('touchend', e => {
+    if (e.touches.length < 2) { isPinching = false; initialPinchDist = null; }
+  });
+
+  // レイヤー・描画変数
+  let layers = [], activeIdx = 0;
+  let __layerSeq = 0;
+  let drawing = false, pts = [];
+  let toolType = 'pen';
+  let strokeStartData = null;
+  let lastPointer = {x:0, y:0};
+
+  // 選択・クリップボード変数
+  let selection = { active:false, x:0,y:0,w:0,h:0, img:null, moving:false, startX:0,startY:0, baseX:0, baseY:0, origin:null, resizeW:0, resizeH:0, scale:1, _srcCanvas:null, _dataVersion:0 };
+  let selectionPointerId = null;
+  let dragMode = 'move';
+  let __clipboard = null;
+
+  // アニメーション変数
+  let animFrames = [], activeAnimIdx = 0;
+  let animPlaying = false, animTimer = null, animLoopsRemaining = 0;
+
+  // 履歴（Undo/Redo）変数
+  let history = [], historyStep = -1;
+  const MAX_HISTORY = 20;
+
+  // ツール設定
+  const penSettings = { size:4, press:0.8, smooth:0.4, taper:0.5 };
+  const shadowSettings = { flow:0.04, wet:0.82, grain:0.25, spacing:0.12, edgeDark: 0.55 };
+
+  // ==========================================
+  // 2. キャンバス・ズーム・タブ初期化
+  // ==========================================
+  function setTab(m){
+    if(!m) return;
+    currentTab = m;
+    tabs.forEach(t => { if(t.dataset.tab) t.classList.toggle('on', t.dataset.tab === m); });
+    Object.values(slots).forEach(e => e && e.classList.remove('on'));
+    if(slots[m]) slots[m].classList.add('on');
+    if(m === 'anim'){ updateAnimUI(); renderAnimFrame(activeAnimIdx); }
+    else { stopAnimPlayback(); redrawComposite(); }
+  }
+  tabs.forEach(t => {
+    if(t.dataset.tab) t.addEventListener('click', () => setTab(t.dataset.tab));
+  });
+
+  function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+
+  function applyZoom(scale){
+    currentScale = scale;
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    stage.style.transform = `scale(${scale})`;
+    elScaleTarget.style.width = Math.floor(baseW * scale) + 'px';
+    elScaleTarget.style.height = Math.floor(baseH * scale) + 'px';
+  }
+
+  function zoomToPoint(nextScale, ox, oy){
+    const pX = (ox + stageContainer.scrollLeft) / currentScale;
+    const pY = (oy + stageContainer.scrollTop) / currentScale;
+    applyZoom(nextScale);
+    stageContainer.scrollLeft = (pX * nextScale) - ox;
+    stageContainer.scrollTop = (pY * nextScale) - oy;
+  }
+
+  function resizeCanvasBase(){
+    const cont = document.querySelector('.stageContainer');
+    if(!cont) return;
+    const r = cont.getBoundingClientRect();
+    baseW = Math.floor(r.width - 40); 
+    baseH = Math.floor(r.height - 40);
+    if(baseW < 100) baseW = 100; if(baseH < 100) baseH = 100;
+    
+    cComp.width = cInput.width = baseW;
+    cComp.height = cInput.height = baseH;
+    
+    applyZoom(1.0);
+    ensureLayerSize(); redrawComposite();
+    history = []; historyStep = -1; 
+  }
+
+  // ==========================================
+  // 3. イベントリスナー (UI)
+  // ==========================================
+  elZoom.oninput = (e) => {
+    const nextScale = +e.target.value / 100;
+    vZoom.innerText = +e.target.value + '%';
+    const rect = stageContainer.getBoundingClientRect();
+    zoomToPoint(nextScale, rect.width / 2, rect.height / 2);
+  };
+
+  const btnHelp = document.getElementById('btnHelp');
+  const helpModal = document.getElementById('helpModal');
+  const btnCloseHelp = document.getElementById('btnCloseHelp');
+  if (btnHelp && helpModal && btnCloseHelp) {
+    btnHelp.onclick = () => helpModal.classList.add('show');
+    btnCloseHelp.onclick = () => helpModal.classList.remove('show');
+    helpModal.onpointerdown = (e) => { if (e.target === helpModal) helpModal.classList.remove('show'); };
+  }
+
+  // ==========================================
+  // 4. レイヤー & アンドゥ ロジック
+  // ==========================================
+  function ensureLayerSize(){
+    layers.forEach(L=>{
+      if(L.canvas.width!==cComp.width || L.canvas.height!==cComp.height){
+        const c=makeCanvas(cComp.width, cComp.height); 
+        const cx=c.getContext('2d', {willReadFrequently:true});
+        cx.drawImage(L.canvas,0,0); L.canvas=c; L.ctx=cx;
+      }
+    });
+  }
+
+  function addLayer(name){
+    const c=makeCanvas(cComp.width, cComp.height);
+    const id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
+    // ★ ロック状態を初期化に追加
+    layers.unshift({id, name, visible:true, locked:false, opacity:1, canvas:c, ctx:c.getContext('2d', {willReadFrequently:true})});
+    activeIdx=0; updateLayerUI();
+  }
+
+  function moveLayer(idx, dir){
+    const newIdx = idx + dir;
+    if(newIdx < 0 || newIdx >= layers.length) return;
+    const tmp = layers[idx]; layers[idx] = layers[newIdx]; layers[newIdx] = tmp;
+    if(activeIdx === idx) activeIdx = newIdx; else if(activeIdx === newIdx) activeIdx = idx;
+    updateLayerUI(); redrawComposite();
+  }
+
+  function updateLayerUI(){
+    const list=document.getElementById('layersList'); list.innerHTML='';
+    layers.forEach((L,i)=>{
+      if(!L.id) L.id = `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`;
+      const el=document.createElement('div');
+      el.className=`layerItem ${i===activeIdx?'on':''}`;
+      // ★ ロックボタンをUIに追加
+      el.innerHTML=`
+        <div class="eye">${L.visible?'👁':'·'}</div>
+        <div class="lock" style="opacity:${L.locked?1:0.3}" title="Lock Layer">${L.locked?'🔒':'🔓'}</div>
+        <div class="lname">${L.name}</div>
+        <div class="moveBtns"><div class="moveBtn up">▲</div><div class="moveBtn down">▼</div></div>
+        <div class="op">${L.opacity.toFixed(1)}</div>`;
+      el.querySelector('.eye').onclick=(e)=>{e.stopPropagation(); L.visible=!L.visible; updateLayerUI(); redrawComposite();};
+      el.querySelector('.lock').onclick=(e)=>{e.stopPropagation(); L.locked=!L.locked; updateLayerUI();};
+      el.querySelector('.moveBtn.up').onclick=(e)=>{e.stopPropagation(); moveLayer(i, -1);};
+      el.querySelector('.moveBtn.down').onclick=(e)=>{e.stopPropagation(); moveLayer(i, 1);};
+
+      el.onclick=(e)=>{
+        if(e.target.classList.contains('lname')) return; 
+        activeIdx=i; updateLayerUI(); syncLayerOp();
+      };
+
+      const lnameEl = el.querySelector('.lname');
+      let clickTimer = null;
+      lnameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (i === activeIdx) {
+          if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; startRename(e); }
+          else { clickTimer = setTimeout(() => { clickTimer = null; }, 400); }
+        } else {
+          activeIdx = i; updateLayerUI(); syncLayerOp();
+        }
+      });
+      const startRename = (e) => {
+        e.stopPropagation();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = L.name;
+        input.style.cssText = 'flex:1;font-size:12px;background:#0a0d12;color:#e8ecf2;border:1px solid #00d0ff;border-radius:4px;padding:1px 4px;outline:none;width:100%;';
+        lnameEl.replaceWith(input);
+        input.focus(); input.select();
+        const commit = () => { const v = input.value.trim(); if (v) L.name = v; updateLayerUI(); updateAnimUI(); };
+        input.onblur = commit;
+        input.onkeydown = (ev) => { if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=L.name; input.blur(); } ev.stopPropagation(); };
+      };
+      let pressTimer = null;
+      lnameEl.addEventListener('touchstart', (e) => { pressTimer = setTimeout(() => startRename(e), 500); }, { passive: true });
+      lnameEl.addEventListener('touchend',   () => clearTimeout(pressTimer), { passive: true });
+      lnameEl.addEventListener('touchmove',  () => clearTimeout(pressTimer), { passive: true });
+
+      list.appendChild(el);
+    });
+    updateAnimUI(); ensureLayerSize(); redrawComposite();
+  }
+
+  function redrawComposite(){
+    gComp.clearRect(0,0,cComp.width,cComp.height);
+    for(let i=layers.length-1; i>=0; i--){ const L=layers[i]; if(L.visible){ gComp.globalAlpha=L.opacity; gComp.drawImage(L.canvas,0,0); } }
+    if(currentTab==='draw' && toolType==='select' && selection.active){
+      const nx = Math.min(selection.x, selection.x + selection.w);
+      const ny = Math.min(selection.y, selection.y + selection.h);
+      const nw = (selection.img && selection.resizeW) ? selection.resizeW : Math.abs(selection.w);
+      const nh = (selection.img && selection.resizeH) ? selection.resizeH : Math.abs(selection.h);
+      gComp.save(); gComp.globalAlpha = 1.0; gComp.setLineDash([6,4]); gComp.lineWidth = 2;
+      gComp.strokeStyle = 'rgba(0,0,0,0.85)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      gComp.lineWidth = 1; gComp.strokeStyle = 'rgba(0,208,255,0.95)'; gComp.strokeRect(nx+0.5, ny+0.5, nw, nh);
+      gComp.setLineDash([]);
+      if(selection.img){
+        if(!selection._srcCanvas || selection._srcCanvas._dataVersion !== selection._dataVersion){
+          const sc = document.createElement('canvas');
+          sc.width = selection.img.width; sc.height = selection.img.height;
+          sc.getContext('2d').putImageData(selection.img, 0, 0);
+          selection._srcCanvas = sc; selection._srcCanvas._dataVersion = selection._dataVersion;
+        }
+        const origW = selection.img.width, origH = selection.img.height;
+        const cx = nx + origW / 2, cy = ny + origH / 2;
+        const px = cx - nw / 2, py = cy - nh / 2;
+        gComp.globalAlpha = 0.9;
+        gComp.drawImage(selection._srcCanvas, px, py, nw, nh);
+      }
+      gComp.restore();
+    }
+  }
+
+  function syncLayerOp(){ if(layers[activeIdx]){ const op=layers[activeIdx].opacity; document.getElementById('layerOpacity').value=op; document.getElementById('vLayerOp').innerText=op.toFixed(2); } }
+
+  function recordHistory(oldData, newData, lIdx){
+    if(historyStep < history.length - 1){ history = history.slice(0, historyStep + 1); }
+    history.push({ layerIdx: lIdx, before: oldData, after: newData });
+    if(history.length > MAX_HISTORY) history.shift(); else historyStep++;
+    updateUndoUI();
+  }
+  function performUndo(){
+    if(historyStep < 0) return; const action = history[historyStep];
+    if(layers[action.layerIdx]){ layers[action.layerIdx].ctx.putImageData(action.before, 0, 0); redrawComposite(); }
+    historyStep--; updateUndoUI();
+  }
+  function performRedo(){
+    if(historyStep >= history.length - 1) return; historyStep++; const action = history[historyStep];
+    if(layers[action.layerIdx]){ layers[action.layerIdx].ctx.putImageData(action.after, 0, 0); redrawComposite(); }
+    updateUndoUI();
+  }
+  function updateUndoUI(){
+    document.getElementById('btnUndo').style.opacity = historyStep >= 0 ? '1' : '0.5';
+    document.getElementById('btnRedo').style.opacity = historyStep < history.length - 1 ? '1' : '0.5';
+  }
+
+  document.getElementById('btnUndo').onclick = performUndo;
+  document.getElementById('btnRedo').onclick = performRedo;
+  document.getElementById('btnAddLayer').onclick=()=>addLayer(`Lyr ${layers.length+1}`);
+  // ★ 削除時のガード
+  document.getElementById('btnDelLayer').onclick=()=>{
+    if(layers[activeIdx] && layers[activeIdx].locked) return;
+    if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}
+  };
+  // ★ 複製時にロック状態を引き継ぐ
+  document.getElementById('btnDupLayer').onclick=()=>{
+    const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); 
+    const cx=c.getContext('2d', {willReadFrequently:true}); cx.drawImage(src.canvas,0,0);
+    layers.splice(activeIdx,0,{name:src.name+' copy', visible:src.visible, locked:src.locked, opacity:src.opacity, canvas:c, ctx:cx}); updateLayerUI();
+  };
+  // ★ クリア時のガード
+  document.getElementById('btnClearActive').onclick=()=>{ 
+      if(!layers[activeIdx] || layers[activeIdx].locked) return;
+      const ctx = layers[activeIdx].ctx; const oldD = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+      ctx.clearRect(0,0,cComp.width,cComp.height); redrawComposite(); 
+      recordHistory(oldD, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx);
+  };
+  document.getElementById('layerOpacity').oninput=(e)=>{ if(layers[activeIdx]){ layers[activeIdx].opacity=+e.target.value; document.getElementById('vLayerOp').innerText=layers[activeIdx].opacity.toFixed(2); redrawComposite(); } };
+
+  // ==========================================
+  // 5. 描画 & 選択ロジック
+  // ==========================================
+  function setTool(t){
+    toolType=t;
+    document.getElementById('toolPen').classList.toggle('active', t==='pen');
+    document.getElementById('toolShadow').classList.toggle('active', t==='shadow');
+    document.getElementById('toolEraser').classList.toggle('active', t==='eraser');
+    document.getElementById('toolSelect').classList.toggle('active', t==='select');
+    
+    const panel = document.getElementById('slot-draw');
+    if(t === 'pen' || t === 'eraser') { panel.classList.add('show-gpen'); panel.classList.remove('show-shadow'); }
+    else if(t === 'shadow') { panel.classList.remove('show-gpen'); panel.classList.add('show-shadow'); }
+    else { panel.classList.remove('show-gpen'); panel.classList.remove('show-shadow'); }
+    if(t !== 'select'){ selection.active = false; selection.img = null; document.getElementById('grp-resize').style.display='none'; }
+    redrawComposite();
+  }
+  document.getElementById('toolPen').onclick=()=>setTool('pen');
+  document.getElementById('toolShadow').onclick=()=>setTool('shadow');
+  document.getElementById('toolEraser').onclick=()=>setTool('eraser');
+  document.getElementById('toolSelect').onclick=()=>setTool('select');
+  document.getElementById('btnApplyResize').onclick=()=>applyResize();
+  document.getElementById('btnResetResize').onclick=()=>resetResize();
+  document.getElementById('selScale').oninput=(e)=>{ 
+    const pct = Number(e.target.value);
+    document.getElementById('vSelScale').textContent = pct;
+    selection.scale = pct / 100;
+    if(selection.img){
+      selection.resizeW = Math.max(1, Math.round(selection.img.width * selection.scale));
+      selection.resizeH = Math.max(1, Math.round(selection.img.height * selection.scale));
+    }
+    redrawComposite();
+  };
+
+  const bindSet = (id, key, dispId, obj=penSettings) => { document.getElementById(id).oninput=(e)=>{ obj[key] = +e.target.value; if(dispId) document.getElementById(dispId).innerText = obj[key]; }; };
+  bindSet('penSize','size','vSize'); bindSet('penPress','press','vPress'); 
+  bindSet('penSmooth','smooth','vSmooth'); bindSet('penTaper','taper','vTaper');
+  bindSet('shadowFlow', 'flow', 'vFlow', shadowSettings); bindSet('shadowWet', 'wet', 'vWet', shadowSettings);
+
+  let wcStampCache = new Map();
+  function makeWatercolorStamp(size, wet=0.7, grain=0.35, edgeDark=0.85){
+    const s = Math.max(6, Math.floor(size)); const key = `${s}|${wet.toFixed(2)}|${grain.toFixed(2)}`;
+    if(wcStampCache.has(key)) return wcStampCache.get(key);
+    const c = document.createElement('canvas'); c.width = c.height = s*2;
+    const g = c.getContext('2d'); const cx = c.width/2, cy = c.height/2; const r = s*(0.85 + wet*0.25);
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0.00, `rgba(0,0,0,0.02)`); grad.addColorStop(0.85, `rgba(0,0,0,${0.08 + 0.15*edgeDark})`); grad.addColorStop(1.00, `rgba(0,0,0,0)`);
+    g.fillStyle = grad; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI*2); g.fill();
+    if(grain > 0){
+        const img = g.getImageData(0,0,c.width,c.height); const d = img.data;
+        for(let i=0;i<d.length;i+=4){ if(d[i+3]>0){ const n = (Math.random()*2-1) * 60 * grain; d[i+3] = Math.max(0, Math.min(255, d[i+3] + n)); } }
+        g.putImageData(img,0,0);
+    }
+    wcStampCache.set(key, c); return c;
+  }
+
+  function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function smoothstep(t){ t=clamp(t,0,1); return t*t*(3-2*t); }
+  function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  function getStrokeLengths(pts){ const lens=[0]; let total=0; for(let i=1; i<pts.length; i++){ total += dist(pts[i-1], pts[i]); lens.push(total); } return {lens, total}; }
+  function getWidthAt(tNorm, pressure, settings){
+    const taperLen = Math.max(0.01, settings.taper); 
+    const inT = smoothstep(tNorm / taperLen); const outT = smoothstep((1-tNorm) / taperLen);
+    const pFactor = Math.pow(pressure, 1.5); const pressFactor = lerp(1.0 - settings.press, 1.0, pFactor);
+    return settings.size * pressFactor * Math.min(inT, outT);
+  }
+
+  function normRect(x,y,w,h){ const nx = (w>=0)? x : x+w; const ny = (h>=0)? y : y+h; return { x: Math.max(0, Math.floor(nx)), y: Math.max(0, Math.floor(ny)), w: Math.max(0, Math.floor(Math.abs(w))), h: Math.max(0, Math.floor(Math.abs(h))) }; }
+  function pointInRect(px,py,r){ return px>=r.x && py>=r.y && px<=(r.x+r.w) && py<=(r.y+r.h); }
+
+  function beginSelect(e){
+    // ★ 選択時のガード
+    const p = evPos(e, cInput); if(!layers[activeIdx] || layers[activeIdx].locked) return;
+    selection.dragging = true;  try{ cInput.setPointerCapture(e.pointerId); }catch(_){} 
+    const r = normRect(selection.x, selection.y, selection.w, selection.h);
+    const inside = selection.active && selection.img && pointInRect(p.x, p.y, r);
+    selection.startX = p.x; selection.startY = p.y;
+    if(inside){
+      selection.moving = true; selection.baseX = selection.x; selection.baseY = selection.y; selection.origin = { x:r.x, y:r.y, w:r.w, h:r.h };
+    }else{
+      selection.active = true; selection.moving = false; selection.img = null; selection.origin = null;
+      selection.x = p.x; selection.y = p.y; selection.w = 0; selection.h = 0;
+    }
+    redrawComposite();
+  }
+
+  function moveSelect(e){
+    const p = evPos(e, cInput); if(!selection.active || !selection.dragging) return; 
+    if(selection.moving){
+      const dx = p.x - selection.startX; const dy = p.y - selection.startY;
+      selection.x = selection.baseX + dx; selection.y = selection.baseY + dy;
+    }else{
+      selection.w = p.x - selection.startX; selection.h = p.y - selection.startY;
+    }
+    redrawComposite();
+  }
+
+  function endSelect(e){
+    if(!layers[activeIdx] || !selection.active) return;
+    const ctx = layers[activeIdx].ctx; selection.dragging = false;   
+    const r = normRect(selection.x, selection.y, selection.w, selection.h);
+    if(!selection.moving){
+      if(r.w < 2 || r.h < 2){ selection.active = false; selection.img = null; redrawComposite(); return; }
+      selection.x = r.x; selection.y = r.y; selection.w = r.w; selection.h = r.h;
+      try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; }
+      selection.resizeW = r.w; selection.resizeH = r.h; selection._dataVersion = (selection._dataVersion||0)+1;
+      redrawComposite(); showResizePanel(); return;
+    }
+    selection.moving = false;
+    if(!selection.img){ try{ selection.img = ctx.getImageData(r.x, r.y, r.w, r.h); }catch(_){ selection.img=null; } }
+    if(!selection.img){ redrawComposite(); return; }
+    const before = snapshotLayer(activeIdx);
+    const prev = selection.origin || normRect(selection.baseX, selection.baseY, selection.w, selection.h);
+    if(dragMode === 'move'){ ctx.clearRect(prev.x, prev.y, prev.w, prev.h); }
+    const nx = Math.max(0, Math.min(cComp.width - selection.img.width, Math.floor(selection.x)));
+    const ny = Math.max(0, Math.min(cComp.height - selection.img.height, Math.floor(selection.y)));
+    ctx.putImageData(selection.img, nx, ny);
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
+    selection.x = nx; selection.y = ny; selection.w = selection.img.width; selection.h = selection.img.height;
+    selection.origin = { x:nx, y:ny, w:selection.img.width, h:selection.img.height };
+    selection.resizeW = selection.img.width; selection.resizeH = selection.img.height;
+    redrawComposite(); showResizePanel();
+  }
+
+  function showResizePanel(){
+    const grp = document.getElementById('grp-resize');
+    if(!selection.active || !selection.img){ grp.style.display='none'; return; }
+    grp.style.display='block';
+    selection.scale = 1;
+    document.getElementById('selScale').value = 100;
+    document.getElementById('vSelScale').textContent = '100';
+  }
+
+  function applyResize(){
+    // ★ リサイズ時のガード
+    if(!selection.active || !selection.img || !layers[activeIdx] || layers[activeIdx].locked) return;
+    const scale = selection.scale || 1;
+    const newW = Math.max(1, Math.round(selection.img.width * scale));
+    const newH = Math.max(1, Math.round(selection.img.height * scale));
+    const tmp = document.createElement('canvas'); tmp.width = newW; tmp.height = newH;
+    if(!selection._srcCanvas){ const sc = document.createElement('canvas'); sc.width=selection.img.width; sc.height=selection.img.height; sc.getContext('2d').putImageData(selection.img,0,0); selection._srcCanvas=sc; }
+    tmp.getContext('2d').drawImage(selection._srcCanvas, 0, 0, newW, newH);
+    const ctx = layers[activeIdx].ctx;
+    const before = snapshotLayer(activeIdx);
+    const orig = selection.origin || { x: Math.round(selection.x), y: Math.round(selection.y), w: selection.img.width, h: selection.img.height };
+    const origCx = orig.x + orig.w / 2;
+    const origCy = orig.y + orig.h / 2;
+    const drawX = Math.round(origCx - newW / 2);
+    const drawY = Math.round(origCy - newH / 2);
+    if(dragMode === 'move') ctx.clearRect(orig.x, orig.y, orig.w, orig.h);
+    ctx.drawImage(tmp, drawX, drawY);
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx);
+    selection.x = drawX; selection.y = drawY;
+    selection.img = ctx.getImageData(drawX, drawY, newW, newH);
+    selection.w = newW; selection.h = newH;
+    selection.resizeW = newW; selection.resizeH = newH;
+    selection.scale = 1; selection._srcCanvas = null; selection._dataVersion = (selection._dataVersion||0)+1;
+    selection.origin = { x: drawX, y: drawY, w: newW, h: newH };
+    redrawComposite(); showResizePanel();
+  }
+
+  function resetResize(){
+    if(!selection.active || !selection.img) return;
+    selection.scale = 1;
+    selection.resizeW = selection.img.width;
+    selection.resizeH = selection.img.height;
+    showResizePanel();
+    redrawComposite();
+  }
+
+  function evPos(e, canvas){
+    const rect = canvas.getBoundingClientRect(); const sx = canvas.width / rect.width; const sy = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  }
+
+  // ==========================================
+  // ★ 統合された描画・イベントロジック（ロック機能対応）
+  // ==========================================
+  cInput.addEventListener('pointerdown', e => { 
+    if (currentTab !== 'draw') return;
+    if (isPinching) return; 
+
+    try { cInput.setPointerCapture(e.pointerId); } catch(_) {}
+    const p = evPos(e, cInput);
+    lastPointer = {x: p.x, y: p.y};
+    
+    // ★ロック判定
+    if (!layers[activeIdx] || !layers[activeIdx].visible || layers[activeIdx].locked) return; 
+
+    if (toolType === 'select') { beginSelect(e); return; }
+
+    drawing = true; 
+    pts = [{x: p.x, y: p.y, p: e.pressure || 0.5}];
+    const ctx = layers[activeIdx].ctx; 
+    strokeStartData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+  });
+
+  cInput.addEventListener('pointermove', e=>{ 
+    if(currentTab!=='draw') return;
+    if(isPinching || e.pointerType === 'touch') return; 
+    
+    const p = evPos(e, cInput); lastPointer = {x:p.x, y:p.y};
+    
+    // ★ロック判定
+    if (!layers[activeIdx] || !layers[activeIdx].visible || layers[activeIdx].locked) return;
+
+    if(toolType==='select'){ moveSelect(e); return; }
+    if(!drawing) return; 
+    
+    const raw={x:p.x, y:p.y, p:e.pressure||0.5};
+    const k = (toolType === 'shadow') ? 0.3 : (1.0 - penSettings.smooth);
+    const last = pts[pts.length-1]; pts.push({ x: last.x+(raw.x-last.x)*k, y: last.y+(raw.y-last.y)*k, p:raw.p });
+    drawPreview(gInput, pts);
+  });
+
+  function drawStroke(ctx, points){
+    if(points.length<2) return; 
+    if(toolType === 'shadow'){
+        const stampSize = penSettings.size * 2; 
+        const stamp = makeWatercolorStamp(stampSize, shadowSettings.wet, shadowSettings.grain, shadowSettings.edgeDark);
+        const baseSpacing = shadowSettings.spacing; const flow = shadowSettings.flow;
+        ctx.save(); ctx.globalAlpha = flow; 
+        for(let i=1; i<points.length; i++){
+            const p0 = points[i-1], p1 = points[i];
+            const dx=p1.x-p0.x, dy=p1.y-p0.y; const distVal = Math.hypot(dx,dy);
+            if(distVal < 0.5) continue; 
+            const speedFactor = Math.min(1.0, 12 / Math.max(1, distVal)); 
+            const dynamicSpacing = baseSpacing * (0.6 + 0.4 * speedFactor);
+            const stepPx = Math.max(1, stamp.width * dynamicSpacing); const n = Math.ceil(distVal / stepPx);
+            for(let j=0; j<n; j++){
+                const t = j/n; const x = p0.x + dx*t; const y = p0.y + dy*t;
+                const jx = (Math.random()*2-1)*0.2; const jy = (Math.random()*2-1)*0.2;
+                const press = lerp(p0.p, p1.p, t); const currentScale = 0.5 + 0.5*press; 
+                const dw = stamp.width * currentScale; const dh = stamp.height * currentScale;
+                ctx.drawImage(stamp, x - dw/2 + jx, y - dh/2 + jy, dw, dh);
+            }
+        }
+        ctx.restore(); return;
+    }
+
+    const {lens, total} = getStrokeLengths(points);
+    const strength = (toolType === 'eraser') ? 2.4 : 1.0;
+    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha = 1.0;
+    if(toolType === 'eraser'){
+        ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+        for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.lineWidth = penSettings.size; ctx.stroke(); return;
+    }
+    for(let i=1; i<points.length; i++){
+      const t0 = lens[i-1]/total, t1 = lens[i]/total;
+      const w0 = getWidthAt(t0, points[i-1].p, penSettings), w1 = getWidthAt(t1, points[i].p, penSettings);
+      ctx.beginPath(); ctx.moveTo(points[i-1].x, points[i-1].y); ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineWidth = ((w0+w1)*0.5) * strength; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(points[i].x, points[i].y, w1/2, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill();
+    }
+  }
+
+  function drawPreview(ctx, points){
+    ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); if(points.length<2) return;
+    if(toolType==='eraser'){
+      ctx.strokeStyle = '#ffcccc'; ctx.globalAlpha=0.5; ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y); for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineWidth = penSettings.size; ctx.stroke();
+    } else if(toolType === 'shadow'){
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = penSettings.size; 
+      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+      for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    } else {
+      drawStroke(ctx, points);
+    }
+  }
+
+  const endStroke = ()=>{
+    if(!drawing) return; drawing=false; const ctx = layers[activeIdx].ctx;
+    if(toolType === 'shadow'){
+        ctx.globalCompositeOperation = 'multiply'; drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    } else {
+        ctx.globalCompositeOperation = (toolType === 'eraser') ? 'destination-out' : 'source-over'; drawStroke(ctx, pts); ctx.globalCompositeOperation = 'source-over';
+    }
+    gInput.clearRect(0,0,cInput.width,cInput.height); pts=[]; redrawComposite();
+    if(strokeStartData){ recordHistory(strokeStartData, ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height), activeIdx); strokeStartData = null; }
+  };
+
+  cInput.addEventListener('pointerup', (e) => {
+    if (toolType === 'select') {
+      endSelect(e); 
+      try { cInput.releasePointerCapture(e.pointerId); } catch (_) {}
+      return;
+    }
+    endStroke();
+  });
+
+  // ==========================================
+  // 6. クリップボード & コントロールUI
+  // ==========================================
+  function snapshotLayer(idx){
+    if(!layers[idx]) return null; const ctx = layers[idx].ctx; return ctx.getImageData(0,0,cComp.width,cComp.height);
+  }
+  function doCopy(){
+    if(!layers[activeIdx]) return;
+    if(selection.active && selection.img){ __clipboard = { kind:'rect', w: selection.img.width, h: selection.img.height, data: selection.img };
+    }else{ const img = snapshotLayer(activeIdx); __clipboard = { kind:'full', w: img.width, h: img.height, data: img }; }
+  }
+  function doCut(){
+    // ★ カット時のガード
+    if(!layers[activeIdx] || layers[activeIdx].locked) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
+    if(selection.active && selection.img){
+      const r = normRect(selection.x, selection.y, selection.w, selection.h);
+      try{ const img = ctx.getImageData(r.x, r.y, r.w, r.h); __clipboard = { kind:'rect', w: img.width, h: img.height, data: img }; ctx.clearRect(r.x, r.y, r.w, r.h); }catch(_){}
+    }else{
+      const img = before; __clipboard = { kind:'full', w: img.width, h: img.height, data: img }; ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
+    }
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
+  }
+  function doPaste(){
+    // ★ ペースト時のガード
+    if(!__clipboard || !layers[activeIdx] || layers[activeIdx].locked) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
+    if(__clipboard.kind === 'rect'){
+      const px = (selection.active) ? Math.floor(selection.x) : Math.floor(lastPointer.x || 0);
+      const py = (selection.active) ? Math.floor(selection.y) : Math.floor(lastPointer.y || 0);
+      const nx = Math.max(0, Math.min(ctx.canvas.width - __clipboard.w, px)); const ny = Math.max(0, Math.min(ctx.canvas.height - __clipboard.h, py));
+      ctx.putImageData(__clipboard.data, nx, ny);
+      selection.active = true; selection.moving = false; selection.x = nx; selection.y = ny; selection.w = __clipboard.w; selection.h = __clipboard.h;
+      try{ selection.img = ctx.getImageData(nx, ny, __clipboard.w, __clipboard.h); }catch(_){ selection.img=null; }
+    }else{ ctx.putImageData(__clipboard.data, 0, 0); selection.active = false; selection.img = null; selection.moving = false; }
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
+  }
+  document.getElementById('btnCopy').onclick = doCopy;
+  document.getElementById('btnCut').onclick = doCut;
+  document.getElementById('btnDelete').onclick = ()=>{
+    // ★ デリート操作のガード
+    if(!layers[activeIdx] || layers[activeIdx].locked) return; const ctx = layers[activeIdx].ctx; const before = snapshotLayer(activeIdx);
+    if(selection.active && selection.img){
+      const r = normRect(selection.x, selection.y, selection.w, selection.h); ctx.clearRect(r.x, r.y, r.w, r.h);
+      selection.active = false; selection.img=null; selection.moving=false; selection.origin=null;
+    }else{ ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height); }
+    const after = snapshotLayer(activeIdx); recordHistory(before, after, activeIdx); redrawComposite();
+  };
+  document.getElementById('btnPaste').onclick = doPaste;
+
+  const elDragMove = document.getElementById('dragModeMove'); const elDragCopy = document.getElementById('dragModeCopy');
+  function syncDragModeUI(){ if(!elDragMove || !elDragCopy) return; elDragMove.classList.toggle('active', dragMode==='move'); elDragCopy.classList.toggle('active', dragMode==='copy'); }
+  if(elDragMove) elDragMove.onclick = ()=>{ dragMode='move'; syncDragModeUI(); };
+  if(elDragCopy) elDragCopy.onclick = ()=>{ dragMode='copy'; syncDragModeUI(); };
+  syncDragModeUI();
+
+  window.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey; if(!mod){
+        if(e.key === 'Escape'){ if(selection.active){ selection.active=false; selection.img=null; selection.moving=false; selection.origin=null; redrawComposite(); } }
+        return;
+    } 
+    const k = (e.key || '').toLowerCase();
+    if(k === 'c'){ e.preventDefault(); doCopy(); } if(k === 'x'){ e.preventDefault(); doCut(); } if(k === 'v'){ e.preventDefault(); doPaste(); }
+  });
+
+  const refImage = document.getElementById('refImage'); const uiToggle = document.getElementById('traceToggle') || document.getElementById('refToggle');
+  const uiYaw = document.getElementById('traceYaw'); const uiPitch = document.getElementById('tracePitch'); const uiOp = document.getElementById('refOp');
+  const CELL_W = 300, CELL_H = 300, START_CX = 150, START_CY = 150, CONTAINER_CW = 150, CONTAINER_CH = 150;
+  const LABEL_YAW = { "-2":"-90", "-1":"-45", "0":"0", "1":"45", "2":"90" }; const LABEL_PITCH = { "2":"30", "1":"15", "0":"0", "-1":"-15", "-2":"-30" };
+  function updateMatrixView(){
+    if(uiToggle && !uiToggle.checked){ if(refContainer) refContainer.style.display = 'none'; return; }
+    if(refContainer) refContainer.style.display = 'block';
+    const yawVal = parseInt(uiYaw.value); const pitchVal = parseInt(uiPitch.value); const zoomVal = 1.5; const opVal = parseFloat(uiOp.value);
+    const elYaw = document.getElementById('vYaw'), elPitch = document.getElementById('vPitch'); const elOp = document.getElementById('vRefOp');
+    if(elYaw) elYaw.innerText = (LABEL_YAW[yawVal] || yawVal) + "°"; if(elPitch) elPitch.innerText = (LABEL_PITCH[pitchVal] || pitchVal) + "°"; if(elOp) elOp.innerText = opVal.toFixed(2);
+    if(refContainer){ refContainer.style.opacity = opVal; refContainer.style.transform = `translate(-50%, -50%) scale(${zoomVal})`; refContainer.style.width = `${CELL_W}px`; refContainer.style.height = `${CELL_H}px`; }
+    const col = yawVal + 2; const row = 2 - pitchVal; const cx = START_CX + col * CELL_W; const cy = START_CY + row * CELL_H;
+    const targetX = CONTAINER_CW - cx; const targetY = CONTAINER_CH - cy;
+    if(refImage){ refImage.style.transform = `translate(${targetX}px, ${targetY}px)`; }
+  }
+  const controls = [uiToggle, uiYaw, uiPitch, uiOp]; controls.forEach(el => { if(el) { el.addEventListener('input', updateMatrixView); el.addEventListener('change', updateMatrixView); }});
+
+  // ==========================================
+  // 7. アニメーション & エクスポート ロジック
+  // ==========================================
+  const elAnimThumbs = document.getElementById('animThumbs');
+  const elAnimSeq = document.getElementById('animSeq');
+  const elAnimFps = document.getElementById('animFps');
+  const elAnimLoop = document.getElementById('animLoop');
+  const vAnimFps = document.getElementById('vAnimFps');
+  const vAnimLoop = document.getElementById('vAnimLoop');
+
+  function getLayerById(id){ return layers.find(L=>L.id===id) || null; }
+  function layerThumbURL(L){
+    const tw=220, th=140; const t=makeCanvas(tw, th); const g=t.getContext('2d');
+    g.clearRect(0,0,tw,th); const sw=L.canvas.width, sh=L.canvas.height;
+    if(sw>0 && sh>0){
+      const s = Math.min(tw/sw, th/sh); const dw = Math.floor(sw*s), dh = Math.floor(sh*s);
+      const dx = Math.floor((tw-dw)/2), dy = Math.floor((th-dh)/2);
+      g.drawImage(L.canvas, 0,0,sw,sh, dx,dy,dw,dh);
+    }
+    return t.toDataURL('image/png');
+  }
+
+  function updateAnimUI(){
+    if(!elAnimThumbs || !elAnimSeq) return;
+    elAnimThumbs.innerHTML='';
+    layers.forEach((L, li)=>{
+      const item=document.createElement('div'); item.className='thumbItem'; const src = layerThumbURL(L);
+      const lnum = layers.length - li;
+      item.innerHTML = `<div class="thumbImg"><img draggable="false" src="${src}"></div><div class="thumbName">L${lnum} ${L.name}</div>`;
+      item.onclick=()=>{ animFrames.push(L.id); activeAnimIdx = animFrames.length-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      elAnimThumbs.appendChild(item);
+    });
+
+    elAnimSeq.innerHTML='';
+    animFrames.forEach((layerId, idx)=>{
+      const L=getLayerById(layerId);
+      const layerIdx = layers.findIndex(l => l.id === layerId);
+      const item=document.createElement('div');
+      item.className = `seqItem ${idx===activeAnimIdx?'on':''}`; item.draggable = true;
+      const src = L ? layerThumbURL(L) : '';
+      const label = L ? L.name : '(missing)';
+      const layerTag = layerIdx >= 0 ? `L${layers.length - layerIdx}` : '?';
+      item.innerHTML = `
+        <div class="seqFrameNum">${idx+1}</div>
+        <div class="seqThumb" style="width:64px;height:48px;">${src?`<img draggable="false" src="${src}">`:''}</div>
+        <div class="seqInfo">
+          <div class="seqLayerTag">${layerTag}</div>
+          <div class="seqLabel">${label}</div>
+        </div>
+        <div class="seqBtns">
+          <div class="moveBtn up" data-act="up">▲</div>
+          <div class="moveBtn down" data-act="down">▼</div>
+          <div class="seqBtnsRow">
+            <div class="seqBtn" data-act="dup">C</div>
+            <div class="seqBtn" data-act="del">D</div>
+          </div>
+        </div>
+      `;
+      item.onclick=()=>{ activeAnimIdx=idx; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="up"]').onclick=(e)=>{ e.stopPropagation(); if(idx===0) return; const [m]=animFrames.splice(idx,1); animFrames.splice(idx-1,0,m); activeAnimIdx=idx-1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="down"]').onclick=(e)=>{ e.stopPropagation(); if(idx>=animFrames.length-1) return; const [m]=animFrames.splice(idx,1); animFrames.splice(idx+1,0,m); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="dup"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx+1,0,layerId); activeAnimIdx=idx+1; updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.querySelector('[data-act="del"]').onclick=(e)=>{ e.stopPropagation(); animFrames.splice(idx,1); if(activeAnimIdx>=animFrames.length) activeAnimIdx=Math.max(0, animFrames.length-1); updateAnimUI(); renderAnimFrame(activeAnimIdx); };
+      item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(idx)); });
+      item.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+      item.addEventListener('drop', (e)=>{
+        e.preventDefault(); const from = Number(e.dataTransfer.getData('text/plain')); const to = idx;
+        if(Number.isNaN(from) || from===to) return;
+        const [moved] = animFrames.splice(from,1); animFrames.splice(to,0,moved);
+        activeAnimIdx = to; updateAnimUI(); renderAnimFrame(activeAnimIdx);
+      });
+      elAnimSeq.appendChild(item);
+    });
+
+    if(elAnimFps && vAnimFps) vAnimFps.textContent = String(elAnimFps.value|0);
+    if(elAnimLoop && vAnimLoop) vAnimLoop.textContent = String(elAnimLoop.value|0);
+  }
+
+  function renderAnimFrame(idx){
+    if(currentTab!=='anim'){ return; }
+    if(animFrames.length===0){ redrawComposite(); return; }
+    if(idx<0 || idx>=animFrames.length) idx=0;
+    const L = getLayerById(animFrames[idx]);
+    if(!L){ redrawComposite(); return; }
+    gComp.clearRect(0,0,cComp.width,cComp.height); gComp.globalAlpha = 1.0; gComp.drawImage(L.canvas, 0,0);
+  }
+
+  function stopAnimPlayback(){ if(animTimer){ clearInterval(animTimer); animTimer=null; } animPlaying=false; }
+  function startAnimPlayback(){
+    if(currentTab!=='anim') return; if(animFrames.length===0) return;
+    stopAnimPlayback(); animPlaying=true;
+    const fps = Math.max(1, Number(elAnimFps?.value||12)); const loop = Number(elAnimLoop?.value||0);
+    animLoopsRemaining = loop; let i = activeAnimIdx||0; const frameMs = Math.floor(1000 / fps);
+    animTimer = setInterval(()=>{
+      if(currentTab!=='anim'){ stopAnimPlayback(); return; }
+      renderAnimFrame(i); i++;
+      if(i>=animFrames.length){
+        i=0;
+        if(loop>0){
+          animLoopsRemaining--;
+          if(animLoopsRemaining<=0){ stopAnimPlayback(); activeAnimIdx=0; updateAnimUI(); renderAnimFrame(activeAnimIdx); return; }
+        }
+      }
+      activeAnimIdx = i; updateAnimUI();
+    }, frameMs);
+  }
+
+  const btnAnimPlay = document.getElementById('btnAnimPlay'); const btnAnimStop = document.getElementById('btnAnimStop');
+  btnAnimPlay && (btnAnimPlay.onpointerdown = (e)=>{ e.preventDefault(); startAnimPlayback(); });
+  btnAnimStop && (btnAnimStop.onpointerdown = (e)=>{ e.preventDefault(); stopAnimPlayback(); renderAnimFrame(activeAnimIdx); });
+  elAnimFps && (elAnimFps.oninput = ()=>{ updateAnimUI(); }); elAnimLoop && (elAnimLoop.oninput = ()=>{ updateAnimUI(); });
+
+  async function downloadBlob(filename, blob){
+    if (typeof showSaveFilePicker === 'function') {
+      try {
+        const ext = filename.split('.').pop().toLowerCase();
+        const mimeMap = { mp4: 'video/mp4', webp: 'image/webp', png: 'image/png', animx: 'application/octet-stream' };
+        const handle = await showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: filename, accept: { [mimeMap[ext] || 'application/octet-stream']: ['.' + ext] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') return; 
+      }
+    }
+    const a = document.createElement('a'); a.download = filename; a.href = URL.createObjectURL(blob);
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 30000);
+  }
+
+  document.getElementById('btnExportPNG').onclick=()=>{
+    const c=makeCanvas(cComp.width,cComp.height), x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+    for(let i=layers.length-1;i>=0;i--){ if(layers[i].visible) x.drawImage(layers[i].canvas,0,0); }
+    const a=document.createElement('a'); a.download='art.png'; a.href=c.toDataURL(); a.click();
+  };
+
+  function buildAnimxProject(){
+    const traceEnabled = uiToggle?.checked ?? true; const yaw = Number(uiYaw?.value ?? 0); const pitch = Number(uiPitch?.value ?? 0);
+    const zoom = 1.5; const op = Number(uiOp?.value ?? 0.35); const fps = Number(document.getElementById('animFps')?.value ?? 12);
+    const loop = Number(document.getElementById('animLoop')?.value ?? 0);
+    // ★ セーブデータに locked を追加
+    const layerPayload = layers.map(l => ({ id: l.id, name: l.name, visible: !!l.visible, locked: !!l.locked, opacity: Number(l.opacity ?? 1), png: l.canvas.toDataURL('image/png') }));
+    return {
+      magic: "ANIMX_PROJECT", schema_version: 1, created_at: new Date().toISOString(),
+      canvas: { w: baseW, h: baseH }, trace: { enabled: traceEnabled, yaw, pitch, zoom, opacity: op },
+      layers: layerPayload, anim: { fps, loop, frames: [...animFrames] },
+      ui: { active_layer_id: layers[activeIdx]?.id ?? null, active_frame_index: activeAnimIdx }
+    };
+  }
+  document.getElementById('btnExportANIMX').onclick = () => {
+    let filename = prompt("Enter project name:", "my_project"); if (filename === null) return;
+    if (filename.trim() === "") filename = "project_" + new Date().getTime();
+    if (!filename.endsWith('.animx')) filename += '.animx';
+    const proj = buildAnimxProject(); const text = JSON.stringify(proj); const blob = new Blob([text], {type: 'application/octet-stream'}); 
+    downloadBlob(filename, blob);
+  };
+
+  const fileImportAnimx = document.getElementById('fileImportAnimx'); const btnImportANIMX = document.getElementById('btnImportANIMX');
+  function isValidAnimxProject(obj){ return obj && obj.magic === 'ANIMX_PROJECT'; }
+  function loadImage(dataUrl){ return new Promise((resolve, reject)=>{ const img = new Image(); img.onload = ()=>resolve(img); img.onerror = ()=>reject(new Error('fail')); img.src = dataUrl; }); }
+  async function applyAnimxProject(proj){
+    if(!isValidAnimxProject(proj)) throw new Error('invalid_animx');
+    baseW = Math.max(1, Math.floor(proj.canvas.w)); baseH = Math.max(1, Math.floor(proj.canvas.h));
+    cComp.width = cInput.width = baseW; cComp.height = cInput.height = baseH;
+    applyZoom(1.0); elZoom.value = 100; vZoom.innerText = "100%";
+    gComp.clearRect(0,0,baseW,baseH); gInput.clearRect(0,0,baseW,baseH);
+    layers = []; __layerSeq = 0;
+    for(const L of proj.layers){
+      const c = makeCanvas(baseW, baseH); const ctx = c.getContext('2d', {willReadFrequently:true});
+      try{ const img = await loadImage(L.png); ctx.drawImage(img, 0,0, c.width, c.height); }catch(_){ }
+      // ★ ロードデータから locked を復元
+      layers.push({ id: String(L.id || `L${Date.now().toString(36)}_${(__layerSeq++).toString(36)}`), name: String(L.name || 'Layer'), visible: !!L.visible, locked: !!L.locked, opacity: Number(L.opacity)||1, canvas: c, ctx });
+    }
+    const wanted = proj.ui?.active_layer_id || null; activeIdx = Math.max(0, layers.findIndex(x=>x.id===wanted));
+    if(proj.trace){ uiToggle.checked = !!proj.trace.enabled; uiYaw.value = String(Number(proj.trace.yaw ?? 0)); uiPitch.value = String(Number(proj.trace.pitch ?? 0)); uiOp.value = String(Number(proj.trace.opacity ?? 0.5)); }
+    updateMatrixView(); animFrames = Array.isArray(proj.anim?.frames) ? proj.anim.frames.map(String) : [];
+    activeAnimIdx = Math.max(0, Math.min(Number(proj.ui?.active_frame_index ?? 0), Math.max(0, animFrames.length-1)));
+    updateLayerUI(); setTab('draw');
+  }
+  btnImportANIMX && (btnImportANIMX.onclick = ()=>{ fileImportAnimx && fileImportAnimx.click(); });
+  fileImportAnimx && fileImportAnimx.addEventListener('change', async ()=>{
+    const f = fileImportAnimx.files && fileImportAnimx.files[0]; if(!f) return;
+    try{ const text = await f.text(); await applyAnimxProject(JSON.parse(text)); }catch(e){ alert('Import failed'); }finally{ fileImportAnimx.value = ''; }
+  });
+
+  function u32le(v){ return [v&255,(v>>8)&255,(v>>16)&255,(v>>24)&255]; } function u16le(v){ return [v&255,(v>>8)&255]; } function u24le(v){ return [v&255,(v>>8)&255,(v>>16)&255]; }
+  function str4(s){ return [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)]; }
+  function readU32LE(d, o){ return (d[o]) | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24); }
+
+  function parseWebPImageChunks(arrayBuffer){
+    const d = new Uint8Array(arrayBuffer); if(String.fromCharCode(...d.slice(0,4)) !== 'RIFF' || String.fromCharCode(...d.slice(8,12)) !== 'WEBP'){ throw new Error('Not a WebP RIFF'); }
+    let off = 12; const chunks = [];
+    while(off + 8 <= d.length){
+      const tag = String.fromCharCode(...d.slice(off, off+4)); const size = readU32LE(d, off+4);
+      const dataStart = off + 8; const dataEnd = dataStart + size; if(dataEnd > d.length) break;
+      if(tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH'){ chunks.push({tag, data: d.slice(dataStart, dataEnd)}); }
+      off = dataEnd + (size % 2); 
+    }
+    return chunks;
+  }
+
+  function makeChunk(tag, dataBytes){
+    const size = dataBytes.length; const pad = size % 2; const out = new Uint8Array(8 + size + pad);
+    out.set(str4(tag), 0); out.set(u32le(size), 4); out.set(dataBytes, 8); return out;
+  }
+
+  function buildAnimatedWebP({width, height, loopCount, frames}){
+    let hasAlpha = false; for(const f of frames){ for(const c of f.chunks){ if(c.tag === 'ALPH' || c.tag === 'VP8L'){ hasAlpha = true; break; } } if(hasAlpha) break; }
+    const flags = (1<<1) | (hasAlpha ? (1<<4) : 0); const vp8xPayload = new Uint8Array([ flags, 0,0,0, ...u24le(width-1), ...u24le(height-1) ]);
+    const chunksOut = [makeChunk('VP8X', vp8xPayload)]; const animPayload = new Uint8Array([ 0,0,0,0, ...u16le(loopCount) ]); chunksOut.push(makeChunk('ANIM', animPayload));
+    for(const f of frames){
+      const duration = Math.max(1, Math.min(0xFFFFFF, f.durationMs|0));
+      const frameHdr = new Uint8Array([ ...u24le(0), ...u24le(0), ...u24le(width-1), ...u24le(height-1), ...u24le(duration), 0x00 ]);
+      let payloadParts = [frameHdr]; for(const c of f.chunks){ payloadParts.push(makeChunk(c.tag, c.data)); }
+      const total = payloadParts.reduce((s,a)=>s+a.length, 0); const payload = new Uint8Array(total);
+      let o=0; for(const part of payloadParts){ payload.set(part, o); o += part.length; }
+      chunksOut.push(makeChunk('ANMF', payload));
+    }
+    const riffSize = 4 + chunksOut.reduce((s,c)=>s+c.length,0); const out = new Uint8Array(8 + riffSize);
+    out.set(str4('RIFF'),0); out.set(u32le(riffSize),4); out.set(str4('WEBP'),8);
+    let o=12; for(const c of chunksOut){ out.set(c,o); o+=c.length; } return out;
+  }
+
+  async function exportAnimationAnimatedWebP(){
+    if(animFrames.length === 0){ alert('No frames in SEQUENCE.'); return; }
+    const w = cComp.width, h = cComp.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d'); const frames = [];
+    const fpsVal = Number(document.getElementById('animFps').value) || 12; const durationMs = Math.round(1000 / fpsVal);
+    const loopVal = Number(document.getElementById('animLoop').value) || 0;
+    const btn = document.getElementById('btnExportAnimWebP'); const originalText = btn.innerText; btn.innerText = "Encoding...";
+    try {
+        for(const layerId of animFrames){
+          const li = layers.findIndex(l=>l.id===layerId); if(li < 0) continue;
+          tctx.clearRect(0,0,w,h); tctx.fillStyle = '#ffffff'; tctx.fillRect(0, 0, w, h); tctx.drawImage(layers[li].canvas, 0, 0);
+          const blob = await new Promise(res=> tmp.toBlob(res, 'image/webp', 0.92));
+          if(!blob || blob.type !== 'image/webp'){ throw new Error('WebP encoding failed.'); }
+          const ab = await blob.arrayBuffer(); const chunks = parseWebPImageChunks(ab); frames.push({chunks, durationMs});
+        }
+        const webpBytes = buildAnimatedWebP({width:w, height:h, loopCount:loopVal, frames});
+        const outBlob = new Blob([webpBytes], {type:'image/webp'}); const ts = new Date().toISOString().replace(/[:.]/g,'-'); downloadBlob(`AnimX_${ts}.webp`, outBlob);
+    } catch(err) { alert("Export Failed: " + err.message); } finally { btn.innerText = originalText; }
+  }
+  const btnExportAnimWebP = document.getElementById('btnExportAnimWebP'); btnExportAnimWebP && (btnExportAnimWebP.onclick = ()=>{ exportAnimationAnimatedWebP(); });
+
+  async function exportAnimationMP4() {
+    if (animFrames.length === 0) { alert('No frames in SEQUENCE.'); return; }
+
+    const btn = document.getElementById('btnExportAnimMP4');
+    const originalText = btn.innerText;
+    btn.innerText = "Loading...";
+
+    if (typeof VideoEncoder === 'undefined') {
+      alert('このブラウザはVideoEncoder（WebCodecs）に対応していません。\niOS 16以上のSafari、またはChromeをお試しください。');
+      btn.innerText = originalText;
+      return;
+    }
+
+    const fpsVal   = Number(document.getElementById('animFps').value) || 12;
+    const encW = cComp.width  % 2 === 0 ? cComp.width  : cComp.width  - 1;
+    const encH = cComp.height % 2 === 0 ? cComp.height : cComp.height - 1;
+    const frameDurationUs = Math.round(1_000_000 / fpsVal); 
+
+    try {
+      btn.innerText = "Loading muxer...";
+      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.mjs');
+
+      const target = new ArrayBufferTarget();
+      const muxer  = new Muxer({
+        target,
+        video: { codec: 'avc', width: encW, height: encH },
+        fastStart: 'in-memory', 
+      });
+
+      const encodedChunks = [];
+      let encError = null;
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: (e) => { encError = e; },
+      });
+
+      await encoder.configure({
+        codec:          'avc1.42E01E', 
+        width:           encW,
+        height:          encH,
+        bitrate:         4_000_000,
+        framerate:       fpsVal,
+        avc:            { format: 'avc' },
+      });
+
+      stopAnimPlayback();
+      const tmp = document.createElement('canvas');
+      tmp.width = encW; tmp.height = encH;
+      const tctx = tmp.getContext('2d');
+
+      for (let i = 0; i < animFrames.length; i++) {
+        if (encError) throw encError;
+        btn.innerText = `Encoding ${i + 1}/${animFrames.length}...`;
+
+        const L = getLayerById(animFrames[i]);
+        tctx.fillStyle = '#ffffff';
+        tctx.fillRect(0, 0, encW, encH);
+        if (L) tctx.drawImage(L.canvas, 0, 0, encW, encH);
+
+        const frame = new VideoFrame(tmp, {
+          timestamp:    i * frameDurationUs,
+          duration:     frameDurationUs,
+        });
+        const keyFrame = i === 0 || i % Math.max(1, Math.round(fpsVal)) === 0;
+        encoder.encode(frame, { keyFrame });
+        frame.close();
+
+        if (i % 10 === 0) await encoder.flush();
+      }
+
+      btn.innerText = "Muxing...";
+      await encoder.flush();
+      encoder.close();
+      muxer.finalize();
+
+      if (encError) throw encError;
+
+      const outBlob = new Blob([target.buffer], { type: 'video/mp4' });
+      await downloadBlob('AnimX_Video.mp4', outBlob);
+
+      redrawComposite();
+      btn.innerText = originalText;
+
+    } catch(err) {
+      console.error(err);
+      btn.innerText = originalText;
+      alert('MP4エンコード失敗: ' + (err.message || err) + 
+            '\n\n考えられる原因:\n・iOS 15以下（WebCodecs非対応）\n・codec設定非対応の端末\n・ネットワークエラー（muxerロード失敗）');
+    }
+  }
+  document.getElementById('btnExportAnimMP4').onclick = exportAnimationMP4;
+
+  // ==========================================
+  // 8. 起動時の初期化実行
+  // ==========================================
+  window.addEventListener('load', resizeCanvasBase);
+  addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
+})();
+
+cInput.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
