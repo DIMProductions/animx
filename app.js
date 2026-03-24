@@ -1164,10 +1164,11 @@
   // ==========================================
   // 8. 起動時の初期化実行
   // ==========================================
-  window.addEventListener('load', resizeCanvasBase);
+window.addEventListener('load', resizeCanvasBase);
   addLayer("Line Art"); updateMatrixView(); setTab('draw'); 
-})();
 
-cInput.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
-});
+  // ★ここへ移動させる（ブロックの中に入れる）
+  cInput.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+})();
