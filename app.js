@@ -313,6 +313,36 @@
     if(layers[activeIdx] && layers[activeIdx].locked) return;
     if(layers.length>1){layers.splice(activeIdx,1); activeIdx=Math.max(0,activeIdx-1); updateLayerUI();}
   };
+  // ★ レイヤー統合（下のレイヤーに結合）の処理を追加
+  document.getElementById('btnMergeLayer').onclick = () => {
+    // 一番下のレイヤーの場合は結合できない
+    if(activeIdx >= layers.length - 1) return;
+
+    const topL = layers[activeIdx];
+    const botL = layers[activeIdx + 1];
+
+    // どちらかのレイヤーがロックされている場合は弾く
+    if(topL.locked || botL.locked) return;
+
+    // 下のレイヤーに、上のレイヤーの画像を不透明度を反映して描き込む
+    const ctx = botL.ctx;
+    ctx.save();
+    ctx.globalAlpha = topL.opacity; // 上のレイヤーの不透明度を適用
+    ctx.drawImage(topL.canvas, 0, 0);
+    ctx.restore();
+
+    // 結合後、上のレイヤーを配列から削除する
+    layers.splice(activeIdx, 1);
+    
+    // ※レイヤー構造が変わるとUndo/Redoのインデックスが狂うため、
+    // 結合などの構造破壊を伴う操作時は履歴をリセットするのが安全設計だ。
+    history = []; 
+    historyStep = -1; 
+    updateUndoUI();
+
+    updateLayerUI(); 
+    redrawComposite();
+  };
   // ★ 複製時にロック状態を引き継ぐ
   document.getElementById('btnDupLayer').onclick=()=>{
     const src=layers[activeIdx]; const c=makeCanvas(src.canvas.width, src.canvas.height); 

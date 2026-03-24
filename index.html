@@ -190,18 +190,18 @@
   </div>
 
   <div class="panel">
-    <h3>LAYERS</h3>
-    <div class="row">
-      <div class="btn accent small" id="btnAddLayer">+ New</div>
-      <div class="btn small" id="btnDupLayer">Copy</div>
-      <div class="btn danger small" id="btnDelLayer">Del</div>
+      <h3>LAYERS</h3>
+      <div class="row">
+        <div class="btn accent small" id="btnAddLayer">+ New</div>
+        <div class="btn small" id="btnDupLayer">Copy</div>
+        <div class="btn small" id="btnMergeLayer">Merge</div>
+        <div class="btn danger small" id="btnDelLayer">Del</div>
+      </div>
+      <label>Onion Skin <span id="vLayerOp">1.0</span></label>
+      <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
+      <div class="sep"></div>
+      <div class="layersList" id="layersList"></div>
     </div>
-    <label>Onion Skin <span id="vLayerOp">1.0</span></label>
-    <input id="layerOpacity" type="range" min="0" max="1" value="1" step="0.01">
-    <div class="sep"></div>
-    <div class="layersList" id="layersList"></div>
-  </div>
-</div>
 
 <script src="app.js"></script>
 </body>
